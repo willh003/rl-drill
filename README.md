@@ -46,29 +46,113 @@ all feeding the same schedule:
 
 ## How it fits together
 
-```
-Mac (launchd, hourly)                    iPhone (home-screen PWA)
-  drill.py  scheduler + sessions          index.html  the whole app
-  drill_ui.js / home_ui.js  windows       srs.js  scheduler port
-  sync.py  pull/merge/push                sw.js  offline + push
-  notify.py + push-send.js  Web Push
-        \                                   /
-         \--> private GitHub repo  <-------/
-              state.json      scheduling state (merged per card)
-              cards.json      the deck (Mac pushes on change)
-              tables.json     paradigm tables (Mac pushes on change)
-              reviews.jsonl   answer history (Mac master copy)
-              reviews-phone.jsonl   phone's answers, adopted by the Mac
-              push-subscription.json   phone -> Mac, for notifications
+The "backend" is a private GitHub repo. That sounds like a joke and is
+actually the whole trick: both devices treat the repo as a shared disk
+with atomic writes — free, durable, authenticated, reachable from
+anywhere, and with nothing of yours running on a server. The Mac talks
+to it with the already-authenticated `gh` CLI; the phone talks to it
+with `fetch` and a fine-grained token that can see this one repo and
+nothing else.
+
+```mermaid
+flowchart TB
+    subgraph mac["Mac"]
+        direction TB
+        drill["drill.py + the windows<br/>scheduler and sessions"]
+        sync["sync.py<br/>pull, merge, push"]
+        notify["notify.py + push-send.js<br/>encrypted Web Push"]
+    end
+
+    subgraph phone["iPhone — home-screen web app"]
+        direction TB
+        app["index.html + srs.js<br/>drill, grid, matching"]
+        sw["sw.js<br/>offline shell, notifications"]
+    end
+
+    subgraph repo["private GitHub repo — the only shared state"]
+        direction LR
+        state["state.json<br/>per-card schedule"]
+        cards["cards.json<br/>tables.json<br/>the deck"]
+        hist["reviews.jsonl<br/>reviews-phone.jsonl<br/>answer history"]
+        sub["push-<br/>subscription.json"]
+    end
+
+    sync <-->|"contents API via gh,<br/>compare-and-swap on SHA"| repo
+    app <-->|"contents API via fetch,<br/>fine-grained PAT"| repo
+    notify -->|"encrypted POST"| apns["Apple's push service"]
+    apns -.->|"lock-screen<br/>notification"| sw
 ```
 
-There is no server. Both devices write through GitHub's contents API
-with compare-and-swap on the file SHA: a conflicting write fails, the
-loser re-reads, merges per card, retries. The merge rule (identical in
-`sync.py` and `srs.js`, enforced by tests): every answer increments
-`reps` or `lapses`, so the entry with the larger `reps + lapses` has
-seen more history and wins; ties break toward the later due date.
-Order of arrival cannot lose answers.
+### Two writers, no server, no lost answers
+
+A shared file that two devices update independently is a recipe for
+one overwriting the other. The contents API prevents that for free:
+every write names the file version (blob SHA) it expects to replace,
+so a stale write fails cleanly instead of clobbering. The loser
+re-reads, merges per card, and tries again:
+
+```mermaid
+sequenceDiagram
+    participant P as Phone
+    participant G as GitHub (state.json)
+    participant M as Mac
+
+    Note over P,M: both devices graded cards while apart
+    P->>G: PUT state.json, expect sha abc
+    G-->>P: 200 — new sha def
+    M->>G: PUT state.json, expect sha abc
+    G-->>M: 409 — abc is stale
+    M->>G: GET state.json
+    G-->>M: content at def, with the phone's answers
+    Note over M: merge per card, then try again
+    M->>G: PUT merged state, expect sha def
+    G-->>M: 200 — new sha ghi
+    Note over P,M: nobody's answers were lost
+```
+
+The merge is per card, and the rule is the same in `sync.py` and
+`srs.js` (the golden test holds them together). It works because the
+scheduler gives every answer a fingerprint: each one increments `reps`
+or `lapses`, so `reps + lapses` is a monotonic count of how much
+history an entry has seen — the entry with more history wins,
+regardless of which device it came from or when it arrived:
+
+```mermaid
+flowchart TD
+    start(["for each card id in either copy"]) --> both{"an entry on<br/>both sides?"}
+    both -->|no| only["keep the one that exists"]
+    both -->|yes| count{"reps + lapses<br/>equal?"}
+    count -->|no| more["keep the larger total —<br/>every answer increments one of them,<br/>so a larger total has seen more history"]
+    count -->|yes| due["same amount of history:<br/>keep the later due date"]
+```
+
+### How a Mac sends an iPhone a lock-screen notification
+
+The same repo carries the push plumbing. The phone's push subscription
+(an endpoint at Apple's push service plus its public keys) syncs to
+the Mac as just another file; the Mac encrypts a payload against it
+(RFC 8291), signs the request with its VAPID key (RFC 8292), and hands
+it to Apple. No third-party push provider, no server — one Node script
+with zero dependencies, validated against the RFC's own test vectors:
+
+```mermaid
+sequenceDiagram
+    participant A as App (installed on the Home Screen)
+    participant R as private repo
+    participant M as Mac (hourly firing)
+    participant W as Apple's push service
+
+    A->>A: Enable notifications
+    A->>R: PUT push-subscription.json
+    M->>R: sync pull
+    R-->>M: subscription — endpoint + keys
+    Note over M: off-hour? too few due? studied<br/>in the last 90 min? then stay quiet
+    M->>W: POST, payload encrypted (RFC 8291),<br/>VAPID-signed (RFC 8292)
+    W-->>A: native lock-screen notification
+    A->>A: tap opens the app on the queue
+```
+
+### The scheduler
 
 The scheduler is SM-2 with same-day learning steps:
 
