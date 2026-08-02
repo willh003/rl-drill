@@ -1,7 +1,8 @@
 // SM-2 scheduling + queue building for the phone, ported line-for-line from
-// drill.py. The Python file remains the reference implementation; a golden
-// test (test-srs.js) asserts this port grades identically. If you change one,
-// change both and re-run the test.
+// drill.py. The Python file remains the reference implementation; the golden
+// test asserts this port grades identically (`node test-srs.js`, vectors
+// from gen-golden.py; CI runs both). If you change one, change both,
+// regenerate the vectors, and re-run the test.
 'use strict';
 
 const SRS = {

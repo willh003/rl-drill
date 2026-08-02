@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v4
+
+      # The committed golden vectors must be exactly what drill.py produces
+      # today -- a scheduler change that skips regenerating them fails here.
+      - name: golden vectors match the reference scheduler
+        run: |
+          python3 gen-golden.py
+          git diff --exit-code golden-srs.json
+
+      - name: srs.js grades identically to drill.py
+        run: node test-srs.js
+
+      - name: queue invariants, reference side
+        run: python3 test-queue.py
+
+      - name: queue invariants, ported side
+        run: node test-queue.js
+
+      - name: web push encryption against the RFC 8291 test vector
+        run: node push-send.js --test
+
+      - name: example deck is well-formed
+        run: python3 validate-deck.py
