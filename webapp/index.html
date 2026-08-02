@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1c1c1e">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<title>Arabic</title>
+<style>
+  :root{--bg:#1c1c1e;--row:#26262a;--row2:#2c2c30;--fg:#f2f2f7;--muted:#8e8e93;
+        --dim:#636368;--line:#3a3a3c;--green:#30d158;--red:#ff453a;
+        --blue:#0a84ff;--amber:#ff9f0a}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--fg);
+       font:16px -apple-system,system-ui,sans-serif;
+       padding:env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+       display:flex;flex-direction:column;overflow:hidden}
+  .screen{display:none;flex:1;flex-direction:column;min-height:0}
+  .screen.on{display:flex}
+  .kicker{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--muted);
+          text-align:center;margin-top:28px}
+  h1{font-size:32px;font-weight:600;text-align:center;margin-top:10px}
+  .sub{color:var(--muted);text-align:center;margin-top:6px;font-size:14px}
+  .bar{height:8px;border-radius:4px;background:var(--row2);margin:20px 0 6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px;background:var(--green)}
+  .barcap{font-size:12px;color:var(--dim);text-align:center;margin-bottom:12px}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 16px}
+  .tile{background:var(--row);border:1px solid var(--line);border-radius:12px;
+        padding:13px 6px;text-align:center}
+  .tile b{display:block;font-size:23px;font-weight:600}
+  .tile span{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--muted)}
+  button{appearance:none;border:1px solid var(--line);background:var(--row);
+         color:var(--fg);border-radius:12px;font:inherit;width:100%;
+         padding:14px 12px;margin-bottom:9px}
+  button:active{background:var(--row2)}
+  button.primary{border-color:var(--green);color:var(--green);font-weight:600;font-size:17px}
+  button.crank{border-color:var(--blue);color:var(--blue);font-weight:600}
+  button small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:3px}
+  .pair{display:flex;gap:10px}.pair button{flex:1}
+  #prompt{flex:0 1 auto;display:flex;align-items:center;justify-content:center;
+          min-height:105px;text-align:center;font-size:29px;font-weight:500;padding:10px 4px}
+  .opts{display:flex;flex-direction:column;gap:10px}
+  .opt{display:flex;align-items:center;gap:14px;background:var(--row);
+       border:1px solid var(--line);border-radius:12px;padding:15px 14px;
+       font-size:16px;text-align:left}
+  .opt b{color:var(--muted);font-size:13px;font-weight:600;min-width:14px}
+  .opt.right{border-color:var(--green)}.opt.right,.opt.right b{color:var(--green)}
+  .opt.wrong{border-color:var(--red)}.opt.wrong,.opt.wrong b{color:var(--red)}
+  #foot{margin:auto 0 12px;padding-top:12px;color:var(--muted);font-size:13px;
+        text-align:center;min-height:38px}
+  #done h1{margin:auto 0 8px}
+  #done .sub{margin-bottom:auto;padding-bottom:20px}
+  .status{font-size:12px;color:var(--dim);text-align:center;min-height:16px;margin-bottom:6px}
+  .status.err{color:var(--red)}
+  textarea{width:100%;background:var(--row);color:var(--fg);border:1px solid var(--line);
+           border-radius:12px;padding:12px;font:14px ui-monospace,monospace;min-height:84px;
+           margin:14px 0}
+  #setup p{color:var(--muted);font-size:14px;line-height:1.5;margin-top:12px}
+  .thead{display:flex;gap:7px;margin:0 0 6px 84px}
+  .thead span{flex:1;font-size:10px;font-weight:600;letter-spacing:.06em;
+              color:var(--dim);text-align:center}
+  .trow{display:flex;align-items:stretch;gap:7px;margin-bottom:7px}
+  .tlabel{width:78px;flex:none;display:flex;align-items:center;justify-content:flex-end;
+          font-size:12px;color:var(--muted);text-align:right;line-height:1.15}
+  .slot{flex:1;min-height:42px;border:1px dashed var(--line);border-radius:10px;
+        display:flex;align-items:center;justify-content:center;font-size:15px;
+        color:var(--fg);padding:2px 4px;text-align:center}
+  .slot.filled{border-style:solid;background:var(--row)}
+  .slot.sel{border-color:var(--blue)}
+  .slot.ok{border-color:var(--green);color:var(--green);background:transparent}
+  .slot.bad{border-color:var(--red);color:var(--red)}
+  .tray{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;
+        padding-top:14px;border-top:1px solid var(--line)}
+  .gtile{background:var(--row);border:1px solid var(--line);border-radius:10px;
+        padding:10px 13px;font-size:15px}
+  .gtile.sel{border-color:var(--blue);color:var(--blue)}
+  .gtile.gone{opacity:0;pointer-events:none}
+  #g-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+            padding-bottom:8px}
+  #g-bar{flex:none;padding-top:10px;border-top:1px solid var(--line);
+         background:var(--bg)}
+  #g-foot{color:var(--muted);font-size:13px;text-align:center;min-height:18px;
+          margin-bottom:9px}
+  #tables{overflow-y:auto}
+  .mwrap{display:flex;gap:10px;flex:1;min-height:0}
+  .mcol{flex:1;display:flex;flex-direction:column;gap:8px}
+  .mcard{flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;
+         background:var(--row);border:1px solid var(--line);border-radius:11px;
+         font-size:15px;text-align:center;padding:6px 8px;line-height:1.15;
+         transition:opacity .18s,border-color .12s}
+  .mcard.sel{border-color:var(--blue);color:var(--blue)}
+  .mcard.bad{border-color:var(--red);color:var(--red)}
+  .mcard.hit{border-color:var(--green);color:var(--green)}
+  .mcard.gone{opacity:0;pointer-events:none;border-color:transparent}
+  #m-bar{flex:none;padding-top:10px;border-top:1px solid var(--line)}
+  #m-foot{color:var(--muted);font-size:13px;text-align:center;min-height:18px;
+          margin-bottom:9px}
+  .seclabel{font-size:11px;font-weight:600;letter-spacing:.07em;color:var(--dim);
+            margin:18px 0 8px}
+  #setup a{color:var(--blue)}
+</style>
+</head>
+<body>
+
+<div id="setup" class="screen">
+  <div class="kicker">LEVANTINE ARABIC</div>
+  <h1>Connect</h1>
+  <p>This app stores your progress in your own private GitHub repo
+     (<b id="s-repo"></b>). Paste a fine-grained personal access token that can
+     read and write the contents of that one repo — nothing else.</p>
+  <textarea id="tok" placeholder="github_pat_…" autocapitalize="off" autocorrect="off"></textarea>
+  <button class="primary" onclick="saveToken()">Save and load deck</button>
+  <div class="status err" id="s-err"></div>
+</div>
+
+<div id="home" class="screen">
+  <div class="kicker">LEVANTINE ARABIC</div>
+  <h1 id="h-due">…</h1>
+  <div class="sub" id="h-sub"></div>
+  <div class="bar"><i id="h-bar" style="width:0%"></i></div>
+  <div class="barcap" id="h-cap"></div>
+  <div class="tiles">
+    <div class="tile"><b id="t-due" style="color:var(--amber)">–</b><span>DUE NOW</span></div>
+    <div class="tile"><b id="t-today" style="color:var(--blue)">–</b><span>DONE TODAY</span></div>
+    <div class="tile"><b id="t-acc" style="color:var(--green)">–</b><span>TODAY RIGHT</span></div>
+    <div class="tile"><b id="t-streak">–</b><span>DAY STREAK</span></div>
+  </div>
+  <button class="primary" onclick="start('due')">Start session<small id="b-sub"></small></button>
+  <button class="crank" onclick="startCrank()">30-minute session<small>rounds keep coming until time is up</small></button>
+  <div class="pair">
+    <button onclick="start('new')">New cards</button>
+    <button onclick="start('hardest')">Trouble</button>
+  </div>
+  <div class="pair">
+    <button onclick="start('lesson')">Latest batch</button>
+    <button onclick="start('all')">Practice</button>
+  </div>
+  <button onclick="openTables()">Tables<small>pronouns and endings, as a grid</small></button>
+  <button id="b-notif" onclick="enablePush()" style="display:none">Enable notifications</button>
+  <div class="status" id="h-status"></div>
+</div>
+
+<div id="drill" class="screen">
+  <div class="kicker" id="d-kicker"></div>
+  <div id="prompt"></div>
+  <div class="opts" id="opts"></div>
+  <div id="foot"></div>
+</div>
+
+<div id="tables" class="screen">
+  <div class="kicker">PARADIGM TABLES</div>
+  <h1 style="font-size:26px">Fill the grid</h1>
+  <div class="sub">Place every tile, then check. The alignment is the lesson.</div>
+  <div id="tbl-list" style="margin-top:20px"></div>
+  <button onclick="goHome()">Back</button>
+</div>
+
+<div id="grid" class="screen">
+  <!-- body is overflow:hidden, so the grid needs its own scroller or the tray
+       and the Check button fall off the bottom of a three-column table. -->
+  <div id="g-scroll">
+    <div class="kicker" id="g-kicker"></div>
+    <h1 id="g-title" style="font-size:23px;margin-top:6px"></h1>
+    <div class="sub" id="g-sub" style="margin-bottom:16px"></div>
+    <div class="thead" id="g-head"></div>
+    <div id="g-rows"></div>
+    <div class="tray" id="g-tray"></div>
+  </div>
+  <div id="g-bar">
+    <div id="g-foot"></div>
+    <button class="primary" id="g-check" onclick="checkGrid()">Check</button>
+    <button onclick="openTables()">Give up</button>
+  </div>
+</div>
+
+<div id="match" class="screen">
+  <div class="kicker" id="m-kicker"></div>
+  <h1 id="m-title" style="font-size:22px;margin-top:6px"></h1>
+  <div class="sub" id="m-sub" style="margin-bottom:14px"></div>
+  <div class="mwrap"><div class="mcol" id="m-left"></div><div class="mcol" id="m-right"></div></div>
+  <div id="m-bar">
+    <div id="m-foot"></div>
+    <button onclick="leaveMatch()" id="m-skip">Back</button>
+  </div>
+</div>
+
+<div id="done" class="screen">
+  <h1 id="done-line"></h1>
+  <div class="sub" id="done-sub"></div>
+  <button class="primary" onclick="start('due')">Again</button>
+  <button onclick="goHome()">Home</button>
+</div>
+
+<script src="./srs.js"></script>
+<script>
+'use strict';
+/* Progress lives in a private GitHub repo that this page and the Mac both
+   update. Every write names the version it replaces (the file SHA), so a
+   conflicting write fails cleanly, gets merged per-card, and retries --
+   the two devices cannot overwrite each other's answers. */
+
+let CFG = null;
+let TOKEN = localStorage.getItem('ghtok') || '';
+let cards = [], state = {}, stateSha = null;
+let pendingReviews = JSON.parse(localStorage.getItem('pendingReviews') || '[]');
+let reviewDays = {};                    // day -> [done, right] from repo history
+let queue = [], idx = 0, right = 0, wrong = 0, locked = false, crankEnd = 0;
+let pushBusy = false, pushDirty = false;
+
+const $ = id => document.getElementById(id);
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  $(id).classList.add('on');
+}
+function status(msg, err) {
+  const el = $('h-status');
+  el.textContent = msg || '';
+  el.className = 'status' + (err ? ' err' : '');
+}
+
+/* ------------------------- GitHub contents API -------------------------- */
+function gh(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({
+    'Authorization': 'Bearer ' + TOKEN,
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }, opts.headers || {});
+  return fetch('https://api.github.com' + path, opts);
+}
+const fileUrl = name =>
+    `/repos/${CFG.owner}/${CFG.repo}/contents/${name}`;
+const dec = b64 => new TextDecoder().decode(
+    Uint8Array.from(atob(b64.replace(/\n/g, '')), c => c.charCodeAt(0)));
+function enc(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  }
+  return btoa(bin);
+}
+async function getFile(name) {
+  const r = await gh(fileUrl(name));
+  if (r.status === 404) return { text: null, sha: null };
+  if (!r.ok) throw new Error(name + ': HTTP ' + r.status);
+  const j = await r.json();
+  return { text: dec(j.content), sha: j.sha };
+}
+
+// A fine-grained token with the wrong scope gets 404, not 403 -- GitHub hides
+// private repos rather than admit they exist. So a bare 404 is ambiguous
+// between "no access" and "no such file". Probe the repo itself to turn it
+// into something the user can actually act on.
+async function preflight() {
+  let r;
+  try {
+    r = await gh('/repos/' + CFG.owner + '/' + CFG.repo);
+  } catch (e) {
+    throw new Error('Cannot reach GitHub. Check the connection.');
+  }
+  if (r.status === 401) {
+    throw new Error('GitHub rejected the token. Paste the whole value \u2014 ' +
+        'it starts with github_pat_ and is one long line with no spaces.');
+  }
+  if (r.status === 404) {
+    throw new Error('That token cannot see ' + CFG.owner + '/' + CFG.repo +
+        '. Edit the token: Repository access \u2192 Only select repositories ' +
+        '\u2192 ' + CFG.repo + ', and Permissions \u2192 Contents: ' +
+        'Read and write.');
+  }
+  if (r.status === 403) {
+    throw new Error('Token blocked (403) \u2014 it may be pending approval, ' +
+        'or hit a rate limit.');
+  }
+  if (!r.ok) throw new Error('GitHub error ' + r.status);
+  const j = await r.json();
+  if (j.permissions && j.permissions.push === false) {
+    throw new Error('Token is read-only, so progress could never be saved. ' +
+        'Set Permissions \u2192 Contents: Read and write.');
+  }
+}
+async function putFile(name, text, sha, message) {
+  const body = { message: message || ('phone: update ' + name), content: enc(text) };
+  if (sha) body.sha = sha;
+  const r = await gh(fileUrl(name), { method: 'PUT', body: JSON.stringify(body) });
+  if (r.status === 409 || r.status === 422) return null;   // conflict
+  if (!r.ok) throw new Error(name + ': HTTP ' + r.status);
+  return (await r.json()).content.sha;
+}
+
+/* ------------------------------ state sync ------------------------------ */
+async function pushState() {
+  if (pushBusy) { pushDirty = true; return; }
+  pushBusy = true;
+  try {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const sha = await putFile('state.json',
+          JSON.stringify(state, null, 1), stateSha, 'phone: graded cards');
+      if (sha) { stateSha = sha; break; }
+      const remote = await getFile('state.json');       // conflict -> merge
+      state = SRS.mergeState(state, JSON.parse(remote.text || '{}'));
+      stateSha = remote.sha;
+    }
+    localStorage.setItem('cachedState', JSON.stringify(state));
+    status('synced ' + new Date().toLocaleTimeString());
+  } catch (e) {
+    status('sync pending — ' + e.message, true);
+    setTimeout(pushState, 15000);                        // offline: retry
+  } finally {
+    pushBusy = false;
+    if (pushDirty) { pushDirty = false; pushState(); }
+  }
+}
+
+async function flushReviews() {
+  if (!pendingReviews.length) return;
+  try {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const f = await getFile('reviews-phone.jsonl');
+      const text = (f.text || '') + pendingReviews.join('\n') + '\n';
+      const sha = await putFile('reviews-phone.jsonl', text, f.sha,
+                                'phone: session history');
+      if (sha) {
+        pendingReviews = [];
+        localStorage.setItem('pendingReviews', '[]');
+        return;
+      }
+    }
+  } catch (e) { /* stays pending; next flush retries */ }
+}
+
+async function loadAll() {
+  const cached = localStorage.getItem('cachedCards');
+  if (cached) {
+    cards = JSON.parse(cached);
+    state = JSON.parse(localStorage.getItem('cachedState') || '{}');
+  }
+  try {
+    await preflight();
+    const [c, s, rv, rp] = await Promise.all([
+      getFile('cards.json'), getFile('state.json'),
+      getFile('reviews.jsonl'), getFile('reviews-phone.jsonl')]);
+    if (c.text === null) {
+      throw new Error('cards.json is missing from ' + CFG.repo + '.');
+    }
+    try {
+      cards = JSON.parse(c.text);
+    } catch (err) {
+      throw new Error('cards.json in the repo is not valid JSON.');
+    }
+    // A corrupt remote state must never brick the app -- fall back to local.
+    let remoteState = {};
+    if (s.text) {
+      try { remoteState = JSON.parse(s.text); } catch (err) { remoteState = {}; }
+    }
+    state = SRS.mergeState(JSON.parse(localStorage.getItem('cachedState') || '{}'),
+                           remoteState);
+    stateSha = s.sha;
+    localStorage.setItem('cachedCards', c.text);
+    localStorage.setItem('cachedState', JSON.stringify(state));
+    reviewDays = {};
+    const seen = new Set();
+    for (const line of ((rv.text || '') + '\n' + (rp.text || '')).split('\n')) {
+      if (!line.trim() || seen.has(line)) continue;
+      seen.add(line);
+      try {
+        const r = JSON.parse(line);
+        const d = r.ts.slice(0, 10);
+        reviewDays[d] = reviewDays[d] || [0, 0];
+        reviewDays[d][0]++; if (r.correct) reviewDays[d][1]++;
+      } catch (e) {}
+    }
+    status('');
+    return true;
+  } catch (e) {
+    if (!cards || !cards.length) throw e;
+    status('offline — using cached deck', true);
+    return false;
+  }
+}
+
+/* -------------------------------- home ---------------------------------- */
+function localToday() { return SRS.iso(new Date()).slice(0, 10); }
+function summary() {
+  const now = new Date();
+  const due = SRS.dueCards(cards, state, now).length;
+  const days = Object.assign({}, reviewDays);
+  for (const line of pendingReviews) {
+    const r = JSON.parse(line); const d = r.ts.slice(0, 10);
+    days[d] = days[d] || [0, 0]; days[d][0]++; if (r.correct) days[d][1]++;
+  }
+  const today = days[localToday()] || [0, 0];
+  let streak = 0;
+  const d = new Date();
+  if (!days[localToday()]) d.setDate(d.getDate() - 1);
+  while (days[SRS.iso(d).slice(0, 10)]) { streak++; d.setDate(d.getDate() - 1); }
+  const seenCards = cards.filter(c => SRS.entryFor(state, c.id).reps > 0).length;
+  return { due, today: today[0],
+           acc: today[0] ? Math.round(100 * today[1] / today[0]) : null,
+           streak, seenCards };
+}
+function renderHome() {
+  const s = summary();
+  $('h-due').textContent = s.due > 0 ? s.due + ' cards due' : 'All caught up';
+  $('h-due').style.color = s.due > 0 ? '' : 'var(--green)';
+  $('h-sub').textContent = s.seenCards + ' of ' + cards.length + ' cards started';
+  const pct = cards.length ? Math.round(100 * s.seenCards / cards.length) : 0;
+  $('h-bar').style.width = pct + '%';
+  $('h-cap').textContent = pct + '% of the deck seen';
+  $('t-due').textContent = s.due;
+  $('t-due').style.color = s.due ? 'var(--amber)' : 'var(--green)';
+  $('t-today').textContent = s.today;
+  $('t-acc').textContent = s.acc === null ? '—' : s.acc + '%';
+  $('t-streak').textContent = s.streak;
+  $('b-sub').textContent = s.due > 0
+      ? Math.min(s.due, SRS.SESSION_CAP) + ' cards waiting' : 'practice round';
+  if (navigator.setAppBadge) {
+    s.due ? navigator.setAppBadge(s.due) : navigator.clearAppBadge();
+  }
+  // iOS only allows push from the installed (Home Screen) app, so ask for it
+  // there and explain the missing step when running in plain Safari.
+  const installed = window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+  const b = $('b-notif');
+  if (!installed) {
+    // iOS exposes the Push API ONLY to Home Screen web apps -- window.PushManager
+    // is undefined in a plain Safari tab. Feature-detecting first would hide the
+    // button and leave no clue, so check install state first and say why.
+    b.style.display = '';
+    b.disabled = true;
+    b.innerHTML = 'Notifications<small>Share \u2192 Add to Home Screen, ' +
+        'then open it from there</small>';
+  } else if ('Notification' in window && 'serviceWorker' in navigator &&
+             'PushManager' in window && Notification.permission === 'default') {
+    b.style.display = '';
+    b.disabled = false;
+    b.innerHTML = 'Enable notifications';
+  } else {
+    b.style.display = 'none';
+  }
+}
+function goHome() { show('home'); renderHome(); flushReviews(); }
+
+/* -------------------------------- drill --------------------------------- */
+function start(mode) {
+  let q = SRS.selectQueue(cards, state, mode, new Date());
+  if (!q.length && crankEnd && mode === 'due') {
+    q = SRS.selectQueue(cards, state, 'all', new Date());
+  }
+  if (!q.length) { status('Nothing to study for that.'); return; }
+  queue = q.map(([card]) => card);
+  idx = 0; right = 0; wrong = 0;
+  show('drill'); render();
+}
+function startCrank() { crankEnd = Date.now() + 30 * 60000; start('due'); }
+
+function render() {
+  const c = queue[idx];
+  locked = false;
+  $('d-kicker').textContent =
+      c.dir === 'ar2en' ? 'CHOOSE THE MEANING' : 'CHOOSE THE ARABIC';
+  $('prompt').textContent = c.prompt;
+  const opts = c.options.slice();
+  for (let i = opts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+  }
+  const box = $('opts');
+  box.innerHTML = '';
+  opts.forEach((o, i) => {
+    const d = document.createElement('div');
+    d.className = 'opt';
+    d.innerHTML = '<b>' + 'ABCD'[i] + '</b><span></span>';
+    d.querySelector('span').textContent = o;
+    d.onclick = () => pick(d, o, c);
+    box.appendChild(d);
+  });
+  let foot = (idx + 1) + ' of ' + queue.length;
+  if (crankEnd) {
+    foot += '   ·   ' +
+        Math.max(0, Math.ceil((crankEnd - Date.now()) / 60000)) + ' min left';
+  }
+  $('foot').textContent = foot;
+}
+
+function pick(el, opt, c) {
+  if (locked) return;
+  locked = true;
+  const ok = opt === c.answer;
+  document.querySelectorAll('.opt').forEach(d => {
+    const t = d.querySelector('span').textContent;
+    if (t === c.answer) d.classList.add('right');
+    else if (d === el) d.classList.add('wrong');
+  });
+  $('foot').textContent = ok ? 'Correct'
+      : c.answer + (c.hint ? '  —  ' + c.hint : '');
+  if (ok) right++; else wrong++;
+  if (navigator.vibrate) navigator.vibrate(ok ? 10 : [30, 40, 30]);
+
+  commitLocal(c, ok);
+  setTimeout(next, ok ? 1000 : 2100);
+}
+
+// The single local write path: grade, cache, queue the history line, sync.
+// Both the card drill and the table game go through here so they can never
+// drift apart in how they touch the schedule.
+function commitLocal(c, ok) {
+  const now = new Date();
+  state[c.id] = SRS.grade(SRS.entryFor(state, c.id), ok, now);
+  localStorage.setItem('cachedState', JSON.stringify(state));
+  pendingReviews.push(JSON.stringify({
+    ts: SRS.iso(now), id: c.id, correct: ok, cat: c.cat, dir: c.dir }));
+  localStorage.setItem('pendingReviews', JSON.stringify(pendingReviews));
+  pushState();
+}
+
+function next() {
+  idx++;
+  if (idx < queue.length) { render(); return; }
+  flushReviews();
+  const more = crankEnd && Date.now() < crankEnd - 20000;
+  // Every set ends on the paradigm: retrieval practice with both sides
+  // shuffled, as a check that the system stuck and not just the cards.
+  runCapstone(more ? () => start('due') : null);
+}
+
+function sessionDone(matchSecs, ladderMsg) {
+  crankEnd = 0;
+  $('done-line').textContent =
+      'Done — ' + right + '/' + (right + wrong) + ' right';
+  const due = SRS.dueCards(cards, state, new Date()).length;
+  const tail = due > 0 ? due + ' more still due' : 'all caught up';
+  const bits = [];
+  if (ladderMsg) bits.push(ladderMsg);
+  if (matchSecs != null) bits.push('matched in ' + matchSecs + 's');
+  bits.push(tail);
+  $('done-sub').textContent = bits.join('   ·   ');
+  show('done');
+}
+
+async function runCapstone(after) {
+  try {
+    if (!TBL) {
+      const f = await getFile('tables.json');
+      if (f.text !== null) TBL = JSON.parse(f.text);
+    }
+  } catch (e) { /* offline -- the coda is optional, the session is not */ }
+  if (!TBL) { return after ? after() : sessionDone(null); }
+  startMatch(capstonePick(), { after: after, gradeOnlyDue: true });
+}
+
+/* ---------------------------- table game --------------------------------- */
+/* A paradigm is a system, not eight unrelated facts. Placing the whole grid at
+   once forces you to reason across persons instead of recognising one form in
+   isolation. Only the FIRST check touches the schedule -- retries are for
+   learning, and grading them would inflate the deck. */
+
+let TBL = null;      // tables.json
+let game = null;
+
+async function openTables() {
+  try {
+    if (!TBL) {
+      const f = await getFile('tables.json');
+      if (f.text === null) { status('tables.json is not in the repo yet.'); return; }
+      TBL = JSON.parse(f.text);
+    }
+  } catch (e) { status('could not load tables: ' + e.message, true); return; }
+
+  const box = $('tbl-list');
+  box.innerHTML = '';
+  const heading = txt => {
+    const h = document.createElement('div');
+    h.className = 'seclabel';
+    h.textContent = txt;
+    box.appendChild(h);
+  };
+  const entry = (title, sub, fn) => {
+    const b = document.createElement('button');
+    b.appendChild(document.createTextNode(title));
+    const s = document.createElement('small');
+    s.textContent = sub;
+    b.appendChild(s);
+    b.onclick = fn;
+    box.appendChild(b);
+  };
+
+  heading('FILL THE GRID  \u00b7  build the system');
+  for (const t of TBL.tables) entry(t.title, t.subtitle, () => startTable(t.id));
+
+  heading('MATCHING  \u00b7  both sides shuffled, no positional crutch');
+  MATCHES.forEach((m, i) => entry(m.title, m.note, () => startMatch(i)));
+
+  show('tables');
+}
+
+/* Matching pairs. The grid keeps persons in canonical order, which means it can
+   be partly solved by position; here BOTH columns are shuffled every round, so
+   the only way through is the mapping itself. */
+const MATCHES = [
+  { left: 'person', right: 'pron',   title: 'Person \u2194 pronoun',
+    note: 'I \u2194 ana' },
+  { left: 'person', right: 'ending', title: 'Person \u2194 ending',
+    note: 'I \u2194 -i' },
+  { left: 'pron',   right: 'ending', title: 'Pronoun \u2194 ending',
+    note: 'ana \u2194 -i, no English at all' },
+  { left: 'person', right: 'book',   title: 'Person \u2194 \u201c\u2026 book\u201d',
+    note: 'I \u2194 ktaabi' },
+];
+
+function paradigm(key) { return TBL.paradigms.find(p => p.key === key); }
+
+function startTable(id) {
+  const t = TBL.tables.find(x => x.id === id);
+  const tiles = [];
+  for (const col of t.columns) {
+    const par = paradigm(col);
+    for (const person of TBL.persons) {
+      const cell = par.cells[person.key];
+      tiles.push({ col, person: person.key, form: cell.form, cardId: cell.cardId });
+    }
+  }
+  for (let i = tiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+  }
+  game = { table: t, tiles, placed: {}, locked: {}, sel: null, attempt: 0,
+           firstTry: 0, total: tiles.length };
+  renderGrid();
+  show('grid');
+}
+
+const cellKey = (person, col) => person + '/' + col;
+
+function renderGrid() {
+  const t = game.table;
+  $('g-kicker').textContent = t.columns.length > 1 ? 'MATCH ACROSS COLUMNS'
+                                                   : 'MATCH EACH PERSON';
+  $('g-title').textContent = t.title;
+  $('g-sub').textContent = t.subtitle;
+
+  const head = $('g-head');
+  head.innerHTML = '';
+  for (const col of t.columns) {
+    const sp = document.createElement('span');
+    sp.textContent = paradigm(col).label.toUpperCase();
+    head.appendChild(sp);
+  }
+
+  const rows = $('g-rows');
+  rows.innerHTML = '';
+  for (const person of TBL.persons) {
+    const row = document.createElement('div');
+    row.className = 'trow';
+    const lab = document.createElement('div');
+    lab.className = 'tlabel';
+    lab.textContent = person.label;
+    row.appendChild(lab);
+    for (const col of t.columns) {
+      const k = cellKey(person.key, col);
+      const slot = document.createElement('div');
+      slot.className = 'slot';
+      const placed = game.placed[k];
+      if (placed) { slot.classList.add('filled'); slot.textContent = placed.form; }
+      if (game.locked[k]) slot.classList.add('ok');
+      else if (game.wrongSet && game.wrongSet[k]) slot.classList.add('bad');
+      if (game.sel && game.sel.col === col && !game.locked[k]) slot.classList.add('sel');
+      slot.onclick = () => tapSlot(person.key, col);
+      row.appendChild(slot);
+    }
+    rows.appendChild(row);
+  }
+
+  const tray = $('g-tray');
+  tray.innerHTML = '';
+  const used = new Set(Object.values(game.placed).map(p => p.col + ':' + p.form));
+  for (const tile of game.tiles) {
+    const el = document.createElement('div');
+    el.className = 'gtile';
+    el.textContent = tile.form;
+    if (used.has(tile.col + ':' + tile.form)) { el.classList.add('gone'); }
+    if (game.sel === tile) el.classList.add('sel');
+    el.onclick = () => { game.sel = (game.sel === tile ? null : tile); renderGrid(); };
+    tray.appendChild(el);
+  }
+
+  const filled = Object.keys(game.placed).length;
+  $('g-foot').textContent = game.msg ||
+      (filled + ' of ' + game.total + ' placed');
+  $('g-check').disabled = filled < game.total;
+  $('g-check').style.opacity = filled < game.total ? 0.45 : 1;
+}
+
+function tapSlot(person, col) {
+  const k = cellKey(person, col);
+  if (game.locked[k]) return;
+  if (game.placed[k] && !game.sel) {          // tap a filled slot to take it back
+    delete game.placed[k];
+  } else if (game.sel) {
+    if (game.sel.col !== col) { game.msg = 'that tile belongs in the other column';
+                                renderGrid(); return; }
+    game.placed[k] = game.sel;
+    game.sel = null;
+  }
+  game.msg = null;
+  if (game.wrongSet) game.wrongSet[k] = false;
+  renderGrid();
+}
+
+function checkGrid() {
+  const t = game.table;
+  const first = game.attempt === 0;
+  game.attempt++;
+  game.wrongSet = {};
+  let wrongCount = 0;
+
+  for (const col of t.columns) {
+    const par = paradigm(col);
+    for (const person of TBL.persons) {
+      const k = cellKey(person.key, col);
+      if (game.locked[k]) continue;
+      const want = par.cells[person.key];
+      const got = game.placed[k];
+      const ok = got && got.form === want.form;
+      if (ok) {
+        game.locked[k] = true;
+        if (first) game.firstTry++;
+      } else {
+        game.wrongSet[k] = true;
+        wrongCount++;
+        delete game.placed[k];
+      }
+      // Only the first pass is a genuine test, so only it counts as a review.
+      if (first) {
+        const card = cards.find(c => c.id === want.cardId);
+        if (card) commitLocal(card, !!ok);
+      }
+    }
+  }
+
+  if (navigator.vibrate) navigator.vibrate(wrongCount ? [30, 40, 30] : 12);
+
+  if (wrongCount === 0) {
+    game.msg = null;
+    const pct = Math.round(100 * game.firstTry / game.total);
+    $('done-line').textContent = 'Grid complete — ' + game.firstTry + '/' +
+        game.total + ' first try';
+    $('done-sub').textContent = pct === 100
+        ? 'perfect, the whole paradigm'
+        : 'the misses are back in your queue for today';
+    show('done');
+    flushReviews();
+    return;
+  }
+  game.msg = wrongCount + (wrongCount === 1 ? ' is' : ' are') +
+             ' wrong — try those again';
+  renderGrid();
+}
+
+/* Expanding rehearsal. Eight unknown pairs at once produces a wall of red and
+   teaches nothing, so the paradigm unlocks in steps: two persons, then four,
+   then all eight. Two consecutive clean rounds promote; a round where half or
+   more were fumbled drops back a step, so you cannot get stranded above your
+   level. The ladder is shared across all four pairings -- it tracks how much
+   of the paradigm you know, not how well you know one presentation of it. */
+const LADDER = [2, 4, 8];
+const LVL_KEY = 'paradigm:level';
+const CLEAN_KEY = 'paradigm:clean';
+
+function levelIdx() {
+  const n = Number(localStorage.getItem(LVL_KEY) || 0);
+  return Math.min(Math.max(n, 0), LADDER.length - 1);
+}
+function personsInPlay() {
+  return TBL.persons.slice(0, Math.min(LADDER[levelIdx()], TBL.persons.length));
+}
+function ladderNote() {
+  const size = personsInPlay().length;
+  if (size >= TBL.persons.length) return 'all ' + size;
+  const need = 2 - Number(localStorage.getItem(CLEAN_KEY) || 0);
+  return size + ' of ' + TBL.persons.length + '  ·  ' +
+         need + ' clean round' + (need === 1 ? '' : 's') + ' to unlock more';
+}
+
+/* Pick the pairing that covers the most paradigm cards actually due, so the
+   coda does real scheduled work instead of rehearsing whatever came next in a
+   rotation. Ties rotate, so the same pairing does not repeat back to back. */
+function capstonePick() {
+  const nowIso = SRS.iso(new Date());
+  const dueIn = m => personsInPlay().reduce((n, p) => {
+    const cid = sideCard(m.right, p.key) || sideCard(m.left, p.key);
+    return n + (cid && SRS.entryFor(state, cid).due <= nowIso ? 1 : 0);
+  }, 0);
+  const scored = MATCHES.map((m, i) => ({ i, n: dueIn(m) }));
+  const best = Math.max.apply(null, scored.map(s => s.n));
+  const pool = scored.filter(s => s.n === best).map(s => s.i);
+  const last = Number(localStorage.getItem('capstoneN'));
+  const next = pool.find(i => i !== last);
+  const pick = next === undefined ? pool[0] : next;
+  localStorage.setItem('capstoneN', String(pick));
+  return pick;
+}
+
+/* ---------------------------- matching game ------------------------------ */
+
+let mgame = null;
+let mtimer = null;
+
+function sideText(which, personKey) {
+  if (which === 'person') return TBL.persons.find(p => p.key === personKey).label;
+  return paradigm(which).cells[personKey].form;
+}
+function sideCard(which, personKey) {
+  return which === 'person' ? null : paradigm(which).cells[personKey].cardId;
+}
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startMatch(i, opts) {
+  opts = opts || {};
+  const m = MATCHES[i];
+  const keys = personsInPlay().map(p => p.key);
+  mgame = {
+    m,
+    left:  shuffled(keys.map(k => ({ key: k, text: sideText(m.left, k) }))),
+    right: shuffled(keys.map(k => ({ key: k, text: sideText(m.right, k) }))),
+    sel: null, done: new Set(), missed: new Set(), graded: new Set(),
+    total: keys.length, started: Date.now(), busy: false,
+    after: opts.after || null,
+    capstone: !!opts.gradeOnlyDue,
+    gradeOnlyDue: !!opts.gradeOnlyDue,
+  };
+  clearInterval(mtimer);
+  mtimer = setInterval(renderMatchFoot, 500);
+  renderMatch();
+  show('match');
+}
+
+function renderMatchFoot() {
+  if (!mgame) return;
+  const secs = Math.floor((Date.now() - mgame.started) / 1000);
+  $('m-foot').textContent = mgame.done.size + ' of ' + mgame.total +
+      '   \u00b7   ' + secs + 's';
+}
+
+function renderMatch() {
+  const m = mgame.m;
+  $('m-kicker').textContent = mgame.capstone ? 'TO FINISH \u2014 TAP A PAIR'
+                                            : 'TAP A PAIR';
+  $('m-skip').textContent = (mgame.capstone || mgame.after) ? 'Skip' : 'Back';
+  $('m-title').textContent = m.title;
+  $('m-sub').textContent = m.note + '   ·   ' + ladderNote();
+  for (const [side, boxId] of [['left', 'm-left'], ['right', 'm-right']]) {
+    const box = $(boxId);
+    box.innerHTML = '';
+    for (const item of mgame[side]) {
+      const el = document.createElement('div');
+      el.className = 'mcard';
+      el.textContent = item.text;
+      if (mgame.done.has(item.key)) el.classList.add('gone');
+      if (mgame.sel && mgame.sel.side === side && mgame.sel.key === item.key) {
+        el.classList.add('sel');
+      }
+      if (mgame.flash && mgame.flash.indexOf(side + ':' + item.key) >= 0) {
+        el.classList.add(mgame.flashOk ? 'hit' : 'bad');
+      }
+      el.onclick = () => tapMatch(side, item.key);
+      box.appendChild(el);
+    }
+  }
+  renderMatchFoot();
+}
+
+function tapMatch(side, key) {
+  if (mgame.busy || mgame.done.has(key)) return;
+  const sel = mgame.sel;
+  if (!sel || sel.side === side) {          // first pick, or switching sides
+    mgame.sel = (sel && sel.side === side && sel.key === key) ? null : { side, key };
+    renderMatch();
+    return;
+  }
+
+  const hit = sel.key === key;
+  mgame.flash = [sel.side + ':' + sel.key, side + ':' + key];
+  mgame.flashOk = hit;
+  mgame.busy = true;
+  renderMatch();
+
+  if (navigator.vibrate) navigator.vibrate(hit ? 10 : [30, 40, 30]);
+
+  if (hit) {
+    // Grade once per pair, and only as correct if it was never fumbled.
+    if (!mgame.graded.has(key)) {
+      mgame.graded.add(key);
+      const cid = sideCard(mgame.m.right, key) || sideCard(mgame.m.left, key);
+      const card = cid && cards.find(c => c.id === cid);
+      // A capstone runs after EVERY set, so grading it unconditionally would
+      // review these 16 cards far more often than the rest of the deck and
+      // skew the schedule. Only record what was genuinely due.
+      const due = card && SRS.entryFor(state, card.id).due <= SRS.iso(new Date());
+      if (card && (!mgame.gradeOnlyDue || due)) {
+        commitLocal(card, !mgame.missed.has(key));
+      }
+    }
+  } else {
+    // The first tap is the cue being resolved, so that is the one missed.
+    mgame.missed.add(sel.key);
+  }
+
+  setTimeout(() => {
+    if (hit) mgame.done.add(key);
+    mgame.flash = null;
+    mgame.sel = null;
+    mgame.busy = false;
+    if (mgame.done.size === mgame.total) return finishMatch();
+    renderMatch();
+  }, hit ? 140 : 320);   // input is ignored while this plays -- keep it short
+}
+
+function finishMatch() {
+  clearInterval(mtimer);
+  const secs = Math.round((Date.now() - mgame.started) / 1000);
+  const clean = mgame.total - mgame.missed.size;
+  const key = 'best:' + mgame.m.title;
+  const best = Number(localStorage.getItem(key) || 0);
+  const record = clean === mgame.total && (!best || secs < best);
+  if (record) localStorage.setItem(key, String(secs));
+  const after = mgame.after, capstone = mgame.capstone;
+  const fumbles = mgame.missed.size, size = mgame.total;
+
+  let moved = null;
+  const lvl = levelIdx();
+  if (fumbles === 0) {
+    const streak = Number(localStorage.getItem(CLEAN_KEY) || 0) + 1;
+    if (streak >= 2 && lvl < LADDER.length - 1) {
+      localStorage.setItem(LVL_KEY, String(lvl + 1));
+      localStorage.setItem(CLEAN_KEY, '0');
+      moved = 'up';
+    } else {
+      localStorage.setItem(CLEAN_KEY, String(streak));
+    }
+  } else {
+    localStorage.setItem(CLEAN_KEY, '0');
+    // half the round fumbled means this step is above you -- step back down
+    // rather than leaving you to fail the same wall repeatedly.
+    if (fumbles * 2 >= size && lvl > 0) {
+      localStorage.setItem(LVL_KEY, String(lvl - 1));
+      moved = 'down';
+    }
+  }
+
+  mgame = null;
+  flushReviews();
+
+  const ladderMsg = moved === 'up'
+      ? 'Unlocked \u2014 now ' + LADDER[levelIdx()] + ' of ' + TBL.persons.length
+      : moved === 'down'
+        ? 'Back to ' + LADDER[levelIdx()] + ' for a bit'
+        : null;
+
+  if (after) { after(); return; }              // crank: straight into the next set
+  if (capstone) { sessionDone(secs, ladderMsg); return; }
+  $('done-line').textContent = ladderMsg || ('Matched \u2014 ' + secs + 's');
+  $('done-sub').textContent = moved
+      ? secs + 's   ·   ' + clean + '/' + size + ' clean'
+      : (record ? 'clean sweep, new best'
+                : clean + '/' + size + ' with no fumble'
+                  + (best ? '   ·   best ' + best + 's' : ''));
+  show('done');
+}
+
+// The capstone is a coda, not a gate -- always leave a way past it.
+function leaveMatch() {
+  clearInterval(mtimer);
+  const g = mgame;
+  mgame = null;
+  if (g && g.after) { g.after(); return; }
+  if (g && g.capstone) { sessionDone(null); return; }
+  openTables();
+}
+
+/* ------------------------------- push ----------------------------------- */
+function b64uToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(s), c => c.charCodeAt(0));
+}
+async function enablePush() {
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { status('notifications declined', true); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: b64uToBytes(CFG.vapidPublicKey),
+    });
+    const cur = await getFile('push-subscription.json');
+    await putFile('push-subscription.json', JSON.stringify(sub.toJSON(), null, 1),
+                  cur.sha, 'phone: push subscription');
+    $('b-notif').style.display = 'none';
+    status('notifications on');
+  } catch (e) { status('push setup failed: ' + e.message, true); }
+}
+
+/* -------------------------------- boot ----------------------------------- */
+async function saveToken() {
+  TOKEN = $('tok').value.trim();
+  if (!TOKEN) return;
+  localStorage.setItem('ghtok', TOKEN);
+  try { await boot(); }
+  catch (e) { $('s-err').textContent = 'Could not load: ' + e.message; }
+}
+async function boot() {
+  CFG = await (await fetch('./config.json')).json();
+  $('s-repo').textContent = CFG.owner + '/' + CFG.repo;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+  if (!TOKEN) { show('setup'); return; }
+  try {
+    await loadAll();
+    goHome();
+  } catch (e) {
+    show('setup');
+    $('s-err').textContent = 'Could not load: ' + e.message;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { flushReviews(); }
+  else if ($('home').classList.contains('on') && TOKEN) {
+    loadAll().then(renderHome).catch(() => {});
+  }
+});
+boot();
+</script>
+</body>
+</html>

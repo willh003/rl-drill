@@ -1,0 +1,42 @@
+# --- Secrets: never commit these ------------------------------------------
+# The VAPID private key. If this leaks, re-key push and every user
+# re-subscribes.
+.vapid.json
+# The phone's push endpoint.
+.push-subscription.json
+.push-subscription.json.expired
+.web-token
+.web-url
+
+# --- Personal data: your deck, your progress -------------------------------
+cards.json
+state.json
+reviews.jsonl
+reviews-phone.jsonl
+.sync-cursor
+.state.lock
+.drill-*
+.home-*
+.home.pid
+tables.json
+webapp/tables.json
+webapp/config.json
+
+# --- Third-party deck exports (not redistributable) ------------------------
+*.apkg
+*.ankiaddon
+All Decksanki-export.txt
+arabic-*.txt
+
+# --- Logs, backups, build artifacts ----------------------------------------
+*.log
+*.bak-*
+*.backup-*
+cards.backup-*.json
+*.app/
+*.icns
+.DS_Store
+
+# --- Local install products ------------------------------------------------
+config.json
+com.*.arabic-drill.plist

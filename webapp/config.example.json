@@ -1,0 +1,5 @@
+{
+ "owner": "YOURUSER",
+ "repo": "arabic-drill-sync",
+ "vapidPublicKey": "PASTE THE publicKeyB64u VALUE PRINTED BY gen-vapid.js"
+}
