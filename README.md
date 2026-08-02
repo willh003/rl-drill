@@ -10,6 +10,40 @@ Built for one learner and published as-is. The deck format is generic —
 swap the content and it drills anything with a prompt, an answer and
 four options.
 
+## What it looks like
+
+The Mac, at a scheduled hour — one window, one card, four options,
+keys 1–4. A wrong answer shows the right one and the hint, then moves
+on:
+
+<p align="center">
+  <img src="screenshots/drill-graded.png" width="520"
+       alt="Desktop drill window: a graded card with the wrong pick in red and the correct answer in green">
+</p>
+
+The home screen and its analytics page:
+
+<p align="center">
+  <img src="screenshots/home.png" width="390"
+       alt="Desktop home window: due count, streak, and session mode buttons">
+  <img src="screenshots/stats.png" width="390"
+       alt="Desktop analytics window: 14-day bar chart, deck spread, upcoming load, trouble cards">
+</p>
+
+The same deck on the phone — drill, paradigm grid, and matching round,
+all feeding the same schedule:
+
+<p align="center">
+  <img src="screenshots/phone-home.png" width="190"
+       alt="Phone home screen with due count and session modes">
+  <img src="screenshots/phone-graded.png" width="190"
+       alt="Phone drill with a graded card">
+  <img src="screenshots/phone-grid.png" width="190"
+       alt="Paradigm grid mid-game: pronouns, endings and possessed forms placed by person">
+  <img src="screenshots/phone-match.png" width="190"
+       alt="Matching round: persons against pronouns, both sides shuffled">
+</p>
+
 ## How it fits together
 
 ```
