@@ -1,0 +1,93 @@
+{
+ "version": 1,
+ "note": "Paradigm tables for the phone's grid and matching games. Each cell links to the card whose schedule it feeds, so a first-try correct placement counts as a real review. The paradigm keys 'pron', 'ending' and 'book' are fixed identifiers the app refers to -- keep the keys, change the forms.",
+ "persons": [
+  { "key": "1s", "label": "I" },
+  { "key": "2ms", "label": "you (to a man)" },
+  { "key": "2fs", "label": "you (to a woman)" },
+  { "key": "3ms", "label": "he" },
+  { "key": "3fs", "label": "she" },
+  { "key": "1p", "label": "we" },
+  { "key": "2p", "label": "you (plural)" },
+  { "key": "3p", "label": "they" }
+ ],
+ "paradigms": [
+  {
+   "key": "pron",
+   "label": "Pronoun",
+   "hint": "ana, inta, ...",
+   "cells": {
+    "1s": { "form": "ana", "cardId": "vocab:ana:en2ar" },
+    "2ms": { "form": "inta", "cardId": "vocab:inta:en2ar" },
+    "2fs": { "form": "inti", "cardId": "vocab:inti:en2ar" },
+    "3ms": { "form": "huwwe", "cardId": "vocab:huwwe:en2ar" },
+    "3fs": { "form": "hiyye", "cardId": "vocab:hiyye:en2ar" },
+    "1p": { "form": "niHna", "cardId": "vocab:niHna:en2ar" },
+    "2p": { "form": "intu", "cardId": "vocab:intu:en2ar" },
+    "3p": { "form": "hinne", "cardId": "vocab:hinne:en2ar" }
+   }
+  },
+  {
+   "key": "ending",
+   "label": "Ending",
+   "hint": "-i, -ak, ...",
+   "cells": {
+    "1s": { "form": "-i", "cardId": "vocab:beiti:en2ar" },
+    "2ms": { "form": "-ak", "cardId": "vocab:beitak:en2ar" },
+    "2fs": { "form": "-ik", "cardId": "vocab:beitik:en2ar" },
+    "3ms": { "form": "-o", "cardId": "vocab:beito:en2ar" },
+    "3fs": { "form": "-a", "cardId": "vocab:beita:en2ar" },
+    "1p": { "form": "-na", "cardId": "vocab:beitna:en2ar" },
+    "2p": { "form": "-kon", "cardId": "vocab:beitkon:en2ar" },
+    "3p": { "form": "-on", "cardId": "vocab:beiton:en2ar" }
+   }
+  },
+  {
+   "key": "book",
+   "label": "… house",
+   "hint": "beiti, beitak, ...",
+   "cells": {
+    "1s": { "form": "beiti", "cardId": "vocab:beiti:en2ar" },
+    "2ms": { "form": "beitak", "cardId": "vocab:beitak:en2ar" },
+    "2fs": { "form": "beitik", "cardId": "vocab:beitik:en2ar" },
+    "3ms": { "form": "beito", "cardId": "vocab:beito:en2ar" },
+    "3fs": { "form": "beita", "cardId": "vocab:beita:en2ar" },
+    "1p": { "form": "beitna", "cardId": "vocab:beitna:en2ar" },
+    "2p": { "form": "beitkon", "cardId": "vocab:beitkon:en2ar" },
+    "3p": { "form": "beiton", "cardId": "vocab:beiton:en2ar" }
+   }
+  }
+ ],
+ "tables": [
+  {
+   "id": "pronouns",
+   "title": "Pronouns",
+   "subtitle": "the eight persons",
+   "columns": ["pron"]
+  },
+  {
+   "id": "endings",
+   "title": "Possessive endings",
+   "subtitle": "the suffix for each person",
+   "columns": ["ending"]
+  },
+  {
+   "id": "house",
+   "title": "My house, your house",
+   "subtitle": "beit + ending",
+   "columns": ["book"]
+  },
+  {
+   "id": "aligned",
+   "title": "Pronoun → ending",
+   "subtitle": "both columns — the alignment is the point",
+   "columns": ["pron", "ending"]
+  },
+  {
+   "id": "full",
+   "title": "The whole paradigm",
+   "subtitle": "all three columns",
+   "columns": ["pron", "ending", "book"]
+  }
+ ]
+}
