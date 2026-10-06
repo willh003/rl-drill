@@ -1,6 +1,6 @@
-// Recall drill -- the window.
+// RL drill -- the window.
 //
-// This file is the source for RecallDrill.app, which drill.py compiles with
+// This file is the source for RLDrill.app, which drill.py compiles with
 // osacompile and launches with `open`. It also runs directly for development:
 //   osascript -l JavaScript drill_ui.js        (with DRILL_PAYLOAD set)
 //
@@ -472,7 +472,7 @@ function start() {
         $.NSMakeRect(0, 0, W, H),
         $.NSWindowStyleMaskTitled | $.NSWindowStyleMaskClosable,
         $.NSBackingStoreBuffered, false);
-    win.title = 'Recall';
+    win.title = 'RL Drill';
     win.backgroundColor = BG;
     win.releasedWhenClosed = false;
 

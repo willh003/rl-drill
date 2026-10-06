@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Recall drill
+RL drill
 ============
 
 One window. One card. Read the front, say the answer to yourself, press space
@@ -58,7 +58,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CARDS = os.path.join(HERE, "cards.json")
 STATE = os.path.join(HERE, "state.json")
 UI = os.path.join(HERE, "drill_ui.js")
-APP = os.path.join(HERE, "RecallDrill.app")
+APP = os.path.join(HERE, "RLDrill.app")
 PAYLOAD_FILE = os.path.join(HERE, ".drill-payload.json")
 RESULTS_FILE = os.path.join(HERE, ".drill-results.jsonl")
 LOG = os.path.join(HERE, "drill.log")
@@ -386,8 +386,8 @@ def build_payload(cards, state, queue, now):
     }
 
 
-def build_app_from(source, dest, display="Recall Drill",
-                   bundle_id="local.recall-drill"):
+def build_app_from(source, dest, display="RL Drill",
+                   bundle_id="local.rl-drill"):
     """Compile a JXA source file into an .app, if it is missing or stale.
 
     The window has to be a LaunchServices app or macOS will not give it the

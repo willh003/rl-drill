@@ -56,7 +56,7 @@ def maybe_notify(force=False):
         if _studied_recently():
             return "studied recently"
 
-    title = "Recall"
+    title = "RL Drill"
     body = f"{due} cards due — a session takes ~3 minutes"
     res = subprocess.run(
         [NODE, os.path.join(HERE, "push-send.js"), SUB_FILE,

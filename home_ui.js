@@ -1,6 +1,6 @@
-// Recall -- home screen and analytics.
+// RL Drill -- home screen and analytics.
 //
-// Source for RecallHome.app, compiled by home.py with osacompile and launched
+// Source for RLHome.app, compiled by home.py with osacompile and launched
 // with `open`. Same constraints as drill_ui.js, for the same reasons:
 //   * no CALayer -- setting a CGColorRef through the JXA bridge crashes with
 //     EXC_ARM_PAC_FAIL, so fills and borders are NSBox
@@ -254,7 +254,7 @@ function sectionLabel(text, top) {
 function buildHome() {
     var pct = S.total ? S.seen / S.total : 0;
 
-    add(label('RECALL', $.NSMakeRect(M, T(40, 16), CW, 16),
+    add(label('RL DRILL', $.NSMakeRect(M, T(40, 16), CW, 16),
         font(11, WT_SEMI), DIM, CENTER, false));
 
     var headline = S.dueNow > 0
@@ -516,7 +516,7 @@ function start() {
         $.NSMakeRect(0, 0, W, H),
         $.NSWindowStyleMaskTitled | $.NSWindowStyleMaskClosable,
         $.NSBackingStoreBuffered, false);
-    win.title = 'Recall';
+    win.title = 'RL Drill';
     win.backgroundColor = BG;
     win.releasedWhenClosed = false;
 

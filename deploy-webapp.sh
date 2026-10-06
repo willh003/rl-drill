@@ -42,7 +42,7 @@ EOF
 
 # Push the whole webapp/ directory as one commit, via a scratch clone --
 # not per-file contents-API calls, which is how deployed copies drift.
-TMP="$(mktemp -d -t arabic-pages)"
+TMP="$(mktemp -d -t rl-pages)"
 trap 'rm -rf "$TMP"' EXIT
 gh repo clone "$PAGES_REPO" "$TMP" -- --depth 1
 find "$TMP" -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +

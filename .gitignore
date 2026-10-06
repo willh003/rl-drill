@@ -31,4 +31,4 @@ cards.backup-*.json
 
 # --- Local install products ------------------------------------------------
 config.json
-com.*.arabic-drill.plist
+com.*.rl-drill.plist

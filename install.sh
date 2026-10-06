@@ -7,12 +7,12 @@
 # Everything is installed pointing at THIS directory -- move the directory
 # and you re-run this. Uninstall:
 #
-#   launchctl unload ~/Library/LaunchAgents/local.arabic-drill.plist
-#   rm ~/Library/LaunchAgents/local.arabic-drill.plist
+#   launchctl unload ~/Library/LaunchAgents/local.rl-drill.plist
+#   rm ~/Library/LaunchAgents/local.rl-drill.plist
 set -e
 DIR="$(cd "$(dirname "$0")" && pwd)"
 AGENTS="$HOME/Library/LaunchAgents"
-PLIST="$AGENTS/local.arabic-drill.plist"
+PLIST="$AGENTS/local.rl-drill.plist"
 
 [ -f "$DIR/cards.json" ] || {
   echo "No cards.json here yet. Copy cards.example.json to cards.json"
@@ -22,7 +22,7 @@ PLIST="$AGENTS/local.arabic-drill.plist"
 
 # --- launchd agent: hourly firings, 8am-10pm --------------------------------
 mkdir -p "$AGENTS"
-sed "s|__DRILL_DIR__|$DIR|g" "$DIR/arabic-drill.plist.template" > "$PLIST"
+sed "s|__DRILL_DIR__|$DIR|g" "$DIR/rl-drill.plist.template" > "$PLIST"
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 echo "loaded $PLIST"
@@ -31,14 +31,14 @@ echo "  fires hourly 08:00-22:00; exits silently when nothing is due"
 # --- Dock launcher (optional but nice) --------------------------------------
 # A compiled applet, because a bare osascript process launched any other way
 # never receives keyboard focus on macOS.
-APP="$DIR/Recall.app"
+APP="$DIR/RL Drill.app"
 TMP_DIR="$(mktemp -d -t launcher)"
 sed "s|__DRILL_DIR__|$DIR|g" "$DIR/launcher.js" > "$TMP_DIR/launcher.js"
 rm -rf "$APP"
 osacompile -s -l JavaScript -o "$APP" "$TMP_DIR/launcher.js"
 rm -rf "$TMP_DIR"
-if [ -f "$DIR/Recall.icns" ]; then
-  cp "$DIR/Recall.icns" "$APP/Contents/Resources/applet.icns"
+if [ -f "$DIR/RLDrill.icns" ]; then
+  cp "$DIR/RLDrill.icns" "$APP/Contents/Resources/applet.icns"
 fi
 echo "built  $APP"
 echo "  drag it into /Applications if you want it in Launchpad/Spotlight"

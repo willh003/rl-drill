@@ -1,6 +1,6 @@
 {
-  "syncRepo": "YOURUSER/arabic-drill-sync",
-  "pagesRepo": "YOURUSER/arabic-drill-app",
-  "appUrl": "https://YOURUSER.github.io/arabic-drill-app/",
+  "syncRepo": "YOURUSER/rl-drill-sync",
+  "pagesRepo": "YOURUSER/rl-drill-app",
+  "appUrl": "https://YOURUSER.github.io/rl-drill-app/",
   "contact": "mailto:you@example.com"
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The Recall home screen.
+"""The RL Drill home screen.
 
     /usr/bin/python3 home.py
 
@@ -12,7 +12,7 @@ a session is on, so the two windows are never on screen competing for the
 keyboard.
 
 The drill itself does not depend on any of this. launchd still runs
-arabic-drill.py -> drill.py, and that path never opens the home screen.
+rl-drill.py -> drill.py, and that path never opens the home screen.
 """
 
 import json
@@ -28,7 +28,7 @@ import drill    # noqa: E402
 import stats    # noqa: E402
 
 UI = os.path.join(HERE, "home_ui.js")
-APP = os.path.join(HERE, "RecallHome.app")
+APP = os.path.join(HERE, "RLHome.app")
 PAYLOAD_FILE = os.path.join(HERE, ".home-payload.json")
 RESULTS_FILE = os.path.join(HERE, ".home-results.jsonl")
 PIDFILE = os.path.join(HERE, ".home.pid")
@@ -96,7 +96,7 @@ def show_home(landing="home"):
     with open(RESULTS_FILE, "w"):
         pass
 
-    drill.build_app_from(UI, APP, "Recall", "local.recall-home")
+    drill.build_app_from(UI, APP, "RL Drill", "local.rl-home")
     subprocess.run(["/usr/bin/open", "-n", "-a", APP], check=True,
                    capture_output=True)
 

@@ -1,7 +1,4 @@
-# arabic-drill
-
-(Born as a Levantine Arabic drill, now a recall trainer for reinforcement
-learning, math and ML — hence the repo name.)
+# rl-drill
 
 A personal spaced-repetition system for things you have to *reproduce*,
 not just recognise: a definition, a derivation, a proof sketch. A card
@@ -227,7 +224,7 @@ nothing due and exit silently — that is by design.
 
 ```
 gh auth login                                    # if you haven't
-gh repo create YOURUSER/arabic-drill-sync --private
+gh repo create YOURUSER/rl-drill-sync --private
 ```
 
 Put `syncRepo` in `config.json`. The Mac now pulls/pushes around every
@@ -237,8 +234,8 @@ changes. Nothing else to seed.
 ### 4. The phone app
 
 ```
-gh repo create YOURUSER/arabic-drill-app --public
-gh api -X POST repos/YOURUSER/arabic-drill-app/pages \
+gh repo create YOURUSER/rl-drill-app --public
+gh api -X POST repos/YOURUSER/rl-drill-app/pages \
        -f build_type=legacy -f "source[branch]=main" -f "source[path]=/"
 ```
 

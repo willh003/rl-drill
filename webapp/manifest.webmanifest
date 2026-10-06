@@ -1,6 +1,6 @@
 {
-  "name": "Recall",
-  "short_name": "Recall",
+  "name": "RL Drill",
+  "short_name": "RL Drill",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

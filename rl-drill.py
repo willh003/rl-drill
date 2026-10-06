@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scheduled entry point for the Recall drill.
+"""Scheduled entry point for the RL drill.
 
 The launchd agent installed by install.sh points at this path, so it stays
 as the thing launchd runs; the actual work lives in drill.py next door.

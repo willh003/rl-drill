@@ -190,7 +190,7 @@ def snapshot(now=None):
 def main():
     s = snapshot()
     pct = round(100 * s["seen"] / s["total"]) if s["total"] else 0
-    print(f"Recall — {s['seen']}/{s['total']} cards started ({pct}%)")
+    print(f"RL Drill — {s['seen']}/{s['total']} cards started ({pct}%)")
     print(f"  due now        {s['dueNow']}")
     print(f"  today          {s['todayDone']} reviews"
           + (f", {s['todayAccuracy']}% right" if s["todayAccuracy"] is not None else ""))

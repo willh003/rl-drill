@@ -1,10 +1,10 @@
 #!/bin/sh
 # One entry point for the Mac side.
 #
-#   ./recall            open the home screen (stats, then pick a session)
-#   ./recall study      jump straight into what is due (silent if nothing is)
-#   ./recall status     print what's due, no window
-#   ./recall install    hourly reminders + a "Recall" Dock app
+#   ./rl-drill            open the home screen (stats, then pick a session)
+#   ./rl-drill study      jump straight into what is due (silent if nothing is)
+#   ./rl-drill status     print what's due, no window
+#   ./rl-drill install    hourly reminders + an "RL Drill" Dock app
 #
 # First run copies the example deck to cards.json so there is something to
 # study. Everything uses the system /usr/bin/python3; nothing is installed.
@@ -20,5 +20,5 @@ case "${1:-home}" in
   study)   exec /usr/bin/python3 drill.py ;;
   status)  exec /usr/bin/python3 drill.py --status ;;
   install) exec sh install.sh ;;
-  *) echo "usage: ./recall [home|study|status|install]"; exit 1 ;;
+  *) echo "usage: ./rl-drill [home|study|status|install]"; exit 1 ;;
 esac

@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>local.arabic-drill</string>
+  <string>local.rl-drill</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
-    <string>__DRILL_DIR__/arabic-drill.py</string>
+    <string>__DRILL_DIR__/rl-drill.py</string>
   </array>
 
   <!-- Hourly, 8am to 10pm. The learning steps are 10min / 30min / 2h, so a
@@ -82,8 +82,8 @@
   <false/>
 
   <key>StandardOutPath</key>
-  <string>__DRILL_DIR__/arabic-drill.out.log</string>
+  <string>__DRILL_DIR__/rl-drill.out.log</string>
   <key>StandardErrorPath</key>
-  <string>__DRILL_DIR__/arabic-drill.err.log</string>
+  <string>__DRILL_DIR__/rl-drill.err.log</string>
 </dict>
 </plist>
