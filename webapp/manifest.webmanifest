@@ -1,6 +1,6 @@
 {
-  "name": "RL Drill",
-  "short_name": "RL Drill",
+  "name": "Learnmax",
+  "short_name": "Learnmax",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

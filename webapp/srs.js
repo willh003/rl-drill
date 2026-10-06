@@ -74,6 +74,24 @@ const SRS = {
     return out;
   },
 
+  // Cards you removed. {id: {removed, ts}}; per card the later write wins, and
+  // a tie goes to "removed" -- same rule as merge_removed in sync.py. Last
+  // write wins (not a union) so that restoring a card is a real write that
+  // beats the earlier removal on every device.
+  mergeRemoved(a, b) {
+    const out = Object.assign({}, a);
+    for (const id of Object.keys(b || {})) {
+      const v = b[id], mine = out[id];
+      if (!mine || (v.ts || '') > (mine.ts || '') ||
+          ((v.ts || '') === (mine.ts || '') && v.removed)) out[id] = v;
+    }
+    return out;
+  },
+
+  liveCards(cards, removed) {
+    return cards.filter(c => !(removed[c.id] && removed[c.id].removed));
+  },
+
   dueCards(cards, state, now) {
     const nowIso = SRS.iso(now);
     const out = [];

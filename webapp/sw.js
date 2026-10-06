@@ -2,7 +2,7 @@
 // offline, from the last sync), and turns Web Push messages from the Mac
 // into native notifications.
 'use strict';
-const CACHE = 'rl-drill-v1';
+const CACHE = 'learnmax-v1';
 const SHELL = ['./', './index.html', './srs.js', './render.js', './card.css',
                './config.json', './manifest.webmanifest',
                './icon-180.png', './icon-512.png',
@@ -53,7 +53,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let data = {};
   try { data = e.data.json(); } catch (err) {}
-  e.waitUntil(self.registration.showNotification(data.title || 'RL Drill', {
+  e.waitUntil(self.registration.showNotification(data.title || 'Learnmax', {
     body: data.body || '',
     icon: './icon-180.png',
     badge: './icon-180.png',

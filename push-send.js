@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Web Push sender for the RL drill -- zero dependencies.
+// Web Push sender for the Learnmax -- zero dependencies.
 //
 //   node push-send.js --test                 run the RFC 8291 known-answer test
 //   node push-send.js sub.json "title" "body" [url]
@@ -179,7 +179,7 @@ if (argv[0] === '--test') {
   selfTest();
 } else {
   const sub = JSON.parse(fs.readFileSync(argv[0]));
-  const payload = { title: argv[1] || 'RL Drill', body: argv[2] || '',
+  const payload = { title: argv[1] || 'Learnmax', body: argv[2] || '',
                     url: argv[3] || '' };
   send(sub, payload).then(r => {
     console.log(r.status, r.body);

@@ -1,0 +1,30 @@
+#!/bin/sh
+# One entry point for the Mac side.
+#
+#   ./learnmax            open the home screen (stats, then pick a session)
+#   ./learnmax study      jump straight into what is due (silent if nothing is)
+#   ./learnmax status     print what's due, no window
+#   ./learnmax removed    list the cards you removed
+#   ./learnmax restore ID bring a removed card back
+#   ./learnmax edit       card editor: new decks, add/edit cards (browser)
+#   ./learnmax install    hourly reminders + an "Learnmax" Dock app
+#
+# First run copies the example deck to cards.json so there is something to
+# study. Everything uses the system /usr/bin/python3; nothing is installed.
+cd "$(dirname "$0")" || exit 1
+
+if [ ! -f cards.json ]; then
+  cp cards.example.json cards.json
+  echo "No cards.json yet -- copied cards.example.json. Edit cards.json to add your own."
+fi
+
+case "${1:-home}" in
+  home)    exec /usr/bin/python3 home.py ;;
+  study)   exec /usr/bin/python3 drill.py ;;
+  status)  exec /usr/bin/python3 drill.py --status ;;
+  removed) exec /usr/bin/python3 drill.py --removed ;;
+  restore) exec /usr/bin/python3 drill.py --restore "$2" ;;
+  edit)    exec /usr/bin/python3 edit.py ;;
+  install) exec sh install.sh ;;
+  *) echo "usage: ./learnmax [home|study|status|removed|restore ID|edit|install]"; exit 1 ;;
+esac

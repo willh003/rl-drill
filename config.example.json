@@ -1,6 +1,6 @@
 {
-  "syncRepo": "YOURUSER/rl-drill-sync",
-  "pagesRepo": "YOURUSER/rl-drill-app",
-  "appUrl": "https://YOURUSER.github.io/rl-drill-app/",
+  "syncRepo": "YOURUSER/learnmax-sync",
+  "pagesRepo": "YOURUSER/learnmax-app",
+  "appUrl": "https://YOURUSER.github.io/learnmax-app/",
   "contact": "mailto:you@example.com"
 }

@@ -98,6 +98,25 @@ def merge_cases():
     return cases
 
 
+def removed_cases():
+    """Last write per card wins; a tie goes to removed. Restoring must beat
+    the earlier removal, which a plain union of ids could not do."""
+    r1 = {"removed": True, "ts": "2026-01-05T09:00:00"}
+    r2 = {"removed": True, "ts": "2026-01-05T10:00:00"}
+    u1 = {"removed": False, "ts": "2026-01-05T10:00:00"}   # restored later
+    u0 = {"removed": False, "ts": "2026-01-05T08:00:00"}   # restored earlier
+    cases = []
+    for a, b in [({"x": r1}, {"x": u1}),      # restore beats removal
+                 ({"x": u1}, {"x": r1}),
+                 ({"x": r1}, {"x": u0}),      # older restore loses
+                 ({"x": u1}, {"x": r2}),      # tie -> removed
+                 ({"x": r2}, {"x": u1}),
+                 ({"x": r1}, {"y": r2}),      # disjoint ids both kept
+                 ({}, {"x": r1}), ({"x": r1}, {}), ({}, {})]:
+        cases.append({"a": a, "b": b, "merged": sync.merge_removed(a, b)})
+    return cases
+
+
 def main():
     vectors = []
     for seq in sequences():
@@ -117,6 +136,7 @@ def main():
         "maxIntervalMin": drill.MAX_INTERVAL_MIN,
         "vectors": vectors,
         "mergeCases": merge_cases(),
+        "removedCases": removed_cases(),
     }
     with open(OUT, "w") as fh:
         json.dump(doc, fh, indent=1)

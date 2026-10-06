@@ -1,6 +1,6 @@
-// RL Drill -- home screen and analytics.
+// Learnmax -- home screen and analytics.
 //
-// Source for RLHome.app, compiled by home.py with osacompile and launched
+// Source for LearnmaxHome.app, compiled by home.py with osacompile and launched
 // with `open`. Same constraints as drill_ui.js, for the same reasons:
 //   * no CALayer -- setting a CGColorRef through the JXA bridge crashes with
 //     EXC_ARM_PAC_FAIL, so fills and borders are NSBox
@@ -254,7 +254,7 @@ function sectionLabel(text, top) {
 function buildHome() {
     var pct = S.total ? S.seen / S.total : 0;
 
-    add(label('RL DRILL', $.NSMakeRect(M, T(40, 16), CW, 16),
+    add(label('LEARNMAX', $.NSMakeRect(M, T(40, 16), CW, 16),
         font(11, WT_SEMI), DIM, CENTER, false));
 
     var headline = S.dueNow > 0
@@ -342,8 +342,11 @@ function buildHome() {
         { cmd: 'start', mode: 'batch' },
         { size: 13, color: S.latestTotal ? FG : DIM });
 
-    button($.NSMakeRect(M, T(566, 44), CW, 44),
+    var halfW = Math.round((CW - 10) / 2);
+    button($.NSMakeRect(M, T(566, 44), halfW, 44),
         'Analytics', null, { cmd: 'view', view: 'stats' }, { size: 14 });
+    button($.NSMakeRect(M + halfW + 10, T(566, 44), CW - halfW - 10, 44),
+        'Edit cards', null, { cmd: 'edit' }, { size: 14 });
 }
 
 // --------------------------------------------------------------- analytics
@@ -479,6 +482,7 @@ onCommand = function (tag) {
     var a = actions[tag];
     if (!a) return;
     if (a.cmd === 'view') { setView(a.view); return; }
+    if (a.cmd === 'edit') { emit({ t: 'cmd', cmd: 'edit' }); return; }  // window stays open
     if (a.cmd === 'start') {
         emit({ t: 'cmd', cmd: 'start', mode: a.mode });
         $.NSApp.terminate($());
@@ -516,7 +520,7 @@ function start() {
         $.NSMakeRect(0, 0, W, H),
         $.NSWindowStyleMaskTitled | $.NSWindowStyleMaskClosable,
         $.NSBackingStoreBuffered, false);
-    win.title = 'RL Drill';
+    win.title = 'Learnmax';
     win.backgroundColor = BG;
     win.releasedWhenClosed = false;
 

@@ -63,6 +63,13 @@
     "batch": "b2"
   },
   {
+    "id": "rl:log-derivative-trick",
+    "front": "State the log-derivative trick.",
+    "back": "$$\\nabla_\\theta p_\\theta(x) = p_\\theta(x)\\,\\nabla_\\theta \\log p_\\theta(x).$$\n\nIt turns the gradient of an expectation into an expectation you can sample:\n\n$$\\nabla_\\theta\\,\\mathbb{E}_{x\\sim p_\\theta}[f(x)] = \\mathbb{E}_{x\\sim p_\\theta}\\big[f(x)\\,\\nabla_\\theta\\log p_\\theta(x)\\big].$$",
+    "cat": "rl",
+    "batch": "b2"
+  },
+  {
     "id": "rl:policy-gradient",
     "front": "Derive the policy gradient theorem (log-derivative trick), in its simplest form.",
     "back": "Objective $J(\\theta) = \\mathbb{E}_{\\tau\\sim p_\\theta}[R(\\tau)]$.\n\n$$\\nabla_\\theta J = \\int \\nabla_\\theta p_\\theta(\\tau)R(\\tau)\\,d\\tau = \\int p_\\theta(\\tau)\\,\\nabla_\\theta\\log p_\\theta(\\tau)\\,R(\\tau)\\,d\\tau.$$\n\nThe dynamics terms in $\\log p_\\theta(\\tau)$ do not depend on $\\theta$, so\n\n$$\\nabla_\\theta J = \\mathbb{E}_\\tau\\Big[\\sum_t \\nabla_\\theta\\log\\pi_\\theta(a_t|s_t)\\,R(\\tau)\\Big].$$\n\nVariance reduction: replace $R(\\tau)$ by the reward-to-go and subtract a baseline $b(s_t)$; neither changes the expectation.",

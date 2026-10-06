@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="./icon-180.png">
 <link rel="stylesheet" href="./vendor/katex/katex.min.css">
 <link rel="stylesheet" href="./card.css">
-<title>RL Drill</title>
+<title>Learnmax</title>
 <style>
   :root{--bg:#1c1c1e;--row:#26262a;--row2:#2c2c30;--fg:#f2f2f7;--muted:#8e8e93;
         --dim:#636368;--line:#3a3a3c;--green:#30d158;--red:#ff453a;
@@ -42,6 +42,8 @@
   button.primary{border-color:var(--green);color:var(--green);font-weight:600;font-size:17px}
   button.crank{border-color:var(--blue);color:var(--blue);font-weight:600}
   button.again{border-color:var(--red);color:var(--red);font-weight:600}
+  button.link{border:none;background:none;color:var(--dim);font-size:13px;
+              padding:8px 0 2px;margin:0}
   button small{display:block;color:var(--muted);font-weight:400;font-size:12px;margin-top:3px}
   .pair{display:flex;gap:10px}.pair button{flex:1}
   #home{overflow-y:auto;-webkit-overflow-scrolling:touch}
@@ -69,7 +71,7 @@
 <body>
 
 <div id="setup" class="screen">
-  <div class="kicker">RL DRILL</div>
+  <div class="kicker">LEARNMAX</div>
   <h1>Connect</h1>
   <p>This app stores your progress in your own private GitHub repo
      (<b id="s-repo"></b>). Paste a fine-grained personal access token that can
@@ -80,7 +82,7 @@
 </div>
 
 <div id="home" class="screen">
-  <div class="kicker">RL DRILL</div>
+  <div class="kicker">LEARNMAX</div>
   <h1 id="h-due">…</h1>
   <div class="sub" id="h-sub"></div>
   <div class="bar"><i id="h-bar" style="width:0%"></i></div>
@@ -117,6 +119,7 @@
       <button class="again" onclick="grade(false)">Still learning<small id="g-no"></small></button>
       <button class="primary" onclick="grade(true)">Got it<small id="g-yes"></small></button>
     </div>
+    <button class="link" onclick="removeCard()">Remove this card</button>
   </div>
 </div>
 
@@ -140,6 +143,8 @@
 let CFG = null;
 let TOKEN = localStorage.getItem('ghtok') || '';
 let cards = [], state = {}, stateSha = null;
+let allCards = [], removedSha = null, removedBusy = false, removedDirty = false;
+let removedMap = JSON.parse(localStorage.getItem('removedMap') || '{}');
 let pendingReviews = JSON.parse(localStorage.getItem('pendingReviews') || '[]');
 let reviewDays = {};                    // day -> [done, right] from repo history
 let queue = [], idx = 0, got = 0, again = 0, revealed = false, crankEnd = 0;
@@ -271,19 +276,21 @@ async function flushReviews() {
 async function loadAll() {
   const cached = localStorage.getItem('cachedCards');
   if (cached) {
-    cards = JSON.parse(cached);
+    allCards = JSON.parse(cached);
+    cards = SRS.liveCards(allCards, removedMap);
     state = JSON.parse(localStorage.getItem('cachedState') || '{}');
   }
   try {
     await preflight();
-    const [c, s, rv, rp] = await Promise.all([
+    const [c, s, rv, rp, rm] = await Promise.all([
       getFile('cards.json'), getFile('state.json'),
-      getFile('reviews.jsonl'), getFile('reviews-phone.jsonl')]);
+      getFile('reviews.jsonl'), getFile('reviews-phone.jsonl'),
+      getFile('removed.json')]);
     if (c.text === null) {
       throw new Error('cards.json is missing from ' + CFG.repo + '.');
     }
     try {
-      cards = JSON.parse(c.text);
+      allCards = JSON.parse(c.text);
     } catch (err) {
       throw new Error('cards.json in the repo is not valid JSON.');
     }
@@ -295,6 +302,15 @@ async function loadAll() {
     state = SRS.mergeState(JSON.parse(localStorage.getItem('cachedState') || '{}'),
                            remoteState);
     stateSha = s.sha;
+    let remoteRemoved = {};
+    if (rm.text) {
+      try { remoteRemoved = JSON.parse(rm.text); } catch (err) { remoteRemoved = {}; }
+    }
+    removedMap = SRS.mergeRemoved(removedMap, remoteRemoved);
+    removedSha = rm.sha;
+    localStorage.setItem('removedMap', JSON.stringify(removedMap));
+    if (JSON.stringify(removedMap) !== JSON.stringify(remoteRemoved)) pushRemoved();
+    cards = SRS.liveCards(allCards, removedMap);
     localStorage.setItem('cachedCards', c.text);
     localStorage.setItem('cachedState', JSON.stringify(state));
     reviewDays = {};
@@ -482,6 +498,43 @@ function commitLocal(c, ok) {
   pushState();
 }
 
+/* "This card isn't useful to me." Not a grade -- it says nothing about whether
+   you know it -- so the schedule is untouched; the card just stops appearing.
+   Kept in removed.json in the sync repo (never by editing cards.json, which
+   the Mac owns), so the Mac honours it too and it can be undone. */
+function removeCard() {
+  const c = queue[idx];
+  if (!c) return;
+  removedMap[c.id] = { removed: true, ts: new Date().toISOString().slice(0, 19) };
+  localStorage.setItem('removedMap', JSON.stringify(removedMap));
+  cards = SRS.liveCards(allCards, removedMap);
+  revealed = false;
+  if (navigator.vibrate) navigator.vibrate(8);
+  pushRemoved();
+  next();
+}
+
+async function pushRemoved() {
+  if (removedBusy) { removedDirty = true; return; }
+  removedBusy = true;
+  try {
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const sha = await putFile('removed.json',
+          JSON.stringify(removedMap, null, 1), removedSha, 'phone: removed cards');
+      if (sha) { removedSha = sha; break; }
+      const remote = await getFile('removed.json');       // conflict -> merge
+      removedMap = SRS.mergeRemoved(removedMap, JSON.parse(remote.text || '{}'));
+      removedSha = remote.sha;
+    }
+    localStorage.setItem('removedMap', JSON.stringify(removedMap));
+  } catch (e) {
+    setTimeout(pushRemoved, 15000);                       // offline: retry
+  } finally {
+    removedBusy = false;
+    if (removedDirty) { removedDirty = false; pushRemoved(); }
+  }
+}
+
 function next() {
   idx++;
   if (idx < queue.length) { render(); return; }
@@ -505,7 +558,8 @@ document.addEventListener('keydown', e => {
   if (e.key === ' ' || e.key === 'Enter') {
     e.preventDefault();
     if (!revealed) reveal();
-  } else if (revealed && (e.key === '1' || e.key === 'ArrowLeft')) grade(false);
+  } else if (e.key === 'x') removeCard();
+  else if (revealed && (e.key === '1' || e.key === 'ArrowLeft')) grade(false);
   else if (revealed && (e.key === '2' || e.key === 'ArrowRight')) grade(true);
 });
 

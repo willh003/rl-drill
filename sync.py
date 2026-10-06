@@ -10,7 +10,8 @@ the drill runs local-only.
   pull()  fetch remote state, merge per-card, adopt phone review history,
           download the push subscription if the phone has registered one
   push()  upload merged state (compare-and-swap; on conflict re-merge and
-          retry), plus cards.json whenever the deck changed
+          retry), plus cards.json whenever the deck changed and removed.json
+          (cards you dropped; last write per card wins)
 
 Merge rule (mirrors srs.js): every answer increments reps or lapses, so for
 any card the entry with the larger reps+lapses total has seen more history
@@ -82,6 +83,27 @@ def merge_state(local, remote):
     return out
 
 
+def merge_removed(a, b):
+    """Per card, the later write wins; a tie goes to "removed" (the safe side:
+    a card you meant to drop never reappears because of a clock tie)."""
+    out = dict(a)
+    for cid, v in b.items():
+        mine = out.get(cid)
+        if (not mine or v.get("ts", "") > mine.get("ts", "")
+                or (v.get("ts", "") == mine.get("ts", "") and v.get("removed"))):
+            out[cid] = v
+    return out
+
+
+def _remote_removed():
+    text, sha = _get("removed.json")
+    try:
+        m = json.loads(text) if text else {}
+    except ValueError:
+        m = {}
+    return (m if isinstance(m, dict) else {}), sha
+
+
 def pull():
     """Adopt everything the phone has done. Returns True if state changed."""
     if not REPO:
@@ -115,6 +137,13 @@ def pull():
             with open(CURSOR, "w") as fh:
                 fh.write(str(len(lines)))
 
+        remote_rm, _sha = _remote_removed()
+        local_rm = drill.load_removed_map()
+        merged_rm = merge_removed(local_rm, remote_rm)
+        if merged_rm != local_rm:
+            drill.save_removed_map(merged_rm)
+            changed = True
+
         text, _sha = _get("push-subscription.json")
         if text:
             open(SUB_FILE, "w").write(text)
@@ -135,6 +164,17 @@ def push():
             drill.save_state(merged)
             if _put("state.json", json.dumps(merged, indent=1), sha,
                     "mac: graded cards"):
+                break
+
+        for _ in range(4):
+            remote_rm, sha = _remote_removed()
+            local_rm = drill.load_removed_map()
+            merged_rm = merge_removed(local_rm, remote_rm)
+            if merged_rm != local_rm:
+                drill.save_removed_map(merged_rm)
+            if merged_rm == remote_rm or _put(
+                    "removed.json", json.dumps(merged_rm, indent=1, sort_keys=True),
+                    sha, "mac: removed cards"):
                 break
 
         local_cards = open(drill.CARDS).read()

@@ -124,6 +124,15 @@ for (const mode of ['due', 'all', 'hardest', 'new', 'batch', 'topic:' + example[
   }
 }
 
+// --- removed cards never reach a session ------------------------------------
+const rm = { [deck[0].id]: { removed: true, ts: 't' } };
+const live = SRS.liveCards(deck, rm);
+check(live.length === deck.length - 1, 'liveCards did not drop the removed card');
+for (const mode of ['due', 'all', 'new', 'batch']) {
+  check(!ids(SRS.selectQueue(live, {}, mode, NOW)).includes(deck[0].id),
+        'removed card served in mode ' + mode);
+}
+
 console.log('test-queue.js: ' + (failures
     ? 'FAILED, ' + failures + ' failure(s)' : 'all invariants hold'));
 process.exit(failures ? 1 : 0);

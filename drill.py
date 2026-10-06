@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RL drill
+Learnmax
 ============
 
 One window. One card. Read the front, say the answer to yourself, press space
@@ -43,25 +43,34 @@ Run with no arguments to study whatever is due.
   --mode MODE     study a chosen slice instead of what's due
                   (due, all, hardest, new, batch, or topic:NAME)
   --demo          open the window on sample cards without touching state.json
+  --removed       list the cards you have removed
+  --restore ID    bring a removed card back
 """
 
 import fcntl
 import json
 import os
+import shutil
 import random
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CARDS = os.path.join(HERE, "cards.json")
 STATE = os.path.join(HERE, "state.json")
 UI = os.path.join(HERE, "drill_ui.js")
-APP = os.path.join(HERE, "RLDrill.app")
+APP = os.path.join(HERE, "LearnmaxDrill.app")
 PAYLOAD_FILE = os.path.join(HERE, ".drill-payload.json")
 RESULTS_FILE = os.path.join(HERE, ".drill-results.jsonl")
 LOG = os.path.join(HERE, "drill.log")
+
+# Ids of cards you have removed ("this one isn't useful"). A separate file
+# rather than an edit to cards.json: removal is reversible, history is kept,
+# and the phone can remove a card without fighting the Mac over cards.json
+# (the Mac is the source of truth for the deck and overwrites it on change).
+REMOVED = os.path.join(HERE, "removed.json")
 
 # Append-only history of every answer ever given. state.json only holds where
 # each card currently sits, which cannot answer "how many did I do today" or
@@ -108,14 +117,70 @@ def log(msg):
         pass
 
 
-def load_cards():
+def utc_stamp():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def load_removed_map():
+    """{card id: {"removed": bool, "ts": UTC iso}}.
+
+    Last write per card wins (sync.merge_removed), so *restoring* a card is a
+    real write that beats the earlier removal. A plain set of ids merged by
+    union could never un-remove anything: the other device would put it back.
+    """
+    try:
+        with open(REMOVED) as fh:
+            m = json.load(fh)
+        return m if isinstance(m, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def load_removed():
+    return {cid for cid, v in load_removed_map().items() if v.get("removed")}
+
+
+def save_removed_map(m):
+    tmp = REMOVED + ".tmp"
+    with open(tmp, "w") as fh:
+        json.dump(m, fh, indent=1, sort_keys=True)
+    os.replace(tmp, REMOVED)
+
+
+def change_removed(add=(), drop=()):
+    """Remove / restore cards under the state lock, so a window and a sync
+    cannot lose each other's change. Returns the set of removed ids."""
+    with open(LOCKFILE, "w") as lk:
+        fcntl.flock(lk, fcntl.LOCK_EX)
+        try:
+            m = load_removed_map()
+            ts = utc_stamp()
+            for cid in add:
+                m[cid] = {"removed": True, "ts": ts}
+            for cid in drop:
+                m[cid] = {"removed": False, "ts": ts}
+            save_removed_map(m)
+        finally:
+            fcntl.flock(lk, fcntl.LOCK_UN)
+    return load_removed()
+
+
+def load_cards(include_removed=False):
     """The deck: a JSON array of {id, front, back, cat, batch?}.
 
     `cat` is the topic ("rl", "math", "ml"...) and `batch` tags a group added
-    together, so "the newest stuff" is answerable without guessing.
+    together, so "the newest stuff" is answerable without guessing. Cards you
+    removed are left out unless include_removed is set.
     """
     with open(CARDS) as fh:
-        return json.load(fh)
+        cards = json.load(fh)
+    if include_removed:
+        return cards
+    gone = load_removed()
+    return [c for c in cards if c["id"] not in gone]
+
+
+LOCKFILE = os.path.join(HERE, ".state.lock")
 
 
 def load_state():
@@ -164,9 +229,6 @@ def load_reviews():
     except OSError:
         pass
     return out
-
-
-LOCKFILE = os.path.join(HERE, ".state.lock")
 
 
 def commit_answer(cid, entry, correct, card, now=None):
@@ -386,8 +448,26 @@ def build_payload(cards, state, queue, now):
     }
 
 
-def build_app_from(source, dest, display="RL Drill",
-                   bundle_id="local.rl-drill"):
+def set_icon(app, icns):
+    """Give an osacompile applet our icon.
+
+    The applet's Info.plist names an icon asset (CFBundleIconName) backed by
+    Assets.car, which holds the generic script icon and wins over applet.icns.
+    Drop both, then re-sign ad hoc since the bundle contents changed.
+    """
+    res = os.path.join(app, "Contents", "Resources")
+    shutil.copy(icns, os.path.join(res, "applet.icns"))
+    if os.path.exists(os.path.join(res, "Assets.car")):
+        os.remove(os.path.join(res, "Assets.car"))
+    subprocess.run(["/usr/bin/plutil", "-remove", "CFBundleIconName",
+                    os.path.join(app, "Contents", "Info.plist")],
+                   check=False, capture_output=True)
+    subprocess.run(["/usr/bin/codesign", "-f", "-s", "-", app],
+                   check=False, capture_output=True)
+
+
+def build_app_from(source, dest, display="Learnmax",
+                   bundle_id="local.learnmax"):
     """Compile a JXA source file into an .app, if it is missing or stale.
 
     The window has to be a LaunchServices app or macOS will not give it the
@@ -429,6 +509,10 @@ def build_app_from(source, dest, display="RL Drill",
             check=False, capture_output=True,
         )
 
+    icon = os.path.join(HERE, "Learnmax.icns")
+    if os.path.isfile(icon):
+        set_icon(tmp, icon)
+
     subprocess.run(["/bin/rm", "-rf", dest], check=False)
     os.replace(tmp, dest)
     subprocess.run(["/bin/rm", "-rf", staging], check=False)
@@ -462,6 +546,10 @@ def run_window(cards, state, persist=True, mode="due", new_cap=None,
             state.update(load_state())   # phone progress arrived; use it
     except Exception:
         pass
+
+    # A sync just now may have brought removals from the phone.
+    gone = load_removed()
+    cards = [c for c in cards if c["id"] not in gone]
 
     now = datetime.now()
     queue = select_queue(cards, state, mode, now, new_cap=new_cap)
@@ -500,7 +588,7 @@ def run_window(cards, state, persist=True, mode="due", new_cap=None,
 
     # `open` returns immediately, so follow the results file rather than a
     # pipe. Polling also copes with the window being closed or escaped.
-    right = wrong = 0
+    right = wrong = removed = 0
     seen = 0
     done = False
     end_reason = None
@@ -538,6 +626,11 @@ def run_window(cards, state, persist=True, mode="due", new_cap=None,
                     right += 1
                 else:
                     wrong += 1
+            elif kind == "remove" and msg.get("id") in by_id:
+                # Not graded: the card is simply never shown again.
+                if persist:
+                    change_removed(add=[msg["id"]])
+                removed += 1
             elif kind == "done":
                 done = True
                 end_reason = msg.get("reason")
@@ -621,6 +714,30 @@ def app_running(app):
 def main():
     cards = load_cards()
     state = load_state()
+
+    if "--removed" in sys.argv:
+        gone = load_removed()
+        by_id = {c["id"]: c for c in load_cards(include_removed=True)}
+        for cid in sorted(gone):
+            front = " ".join(by_id[cid]["front"].split())[:70] \
+                if cid in by_id else "(not in cards.json)"
+            print(f"{cid}  {front}")
+        print(f"{len(gone)} removed")
+        return 0
+
+    if "--restore" in sys.argv:
+        i = sys.argv.index("--restore")
+        if len(sys.argv) <= i + 1:
+            print("usage: drill.py --restore ID")
+            return 1
+        change_removed(drop=[sys.argv[i + 1]])
+        print(f"restored {sys.argv[i + 1]}")
+        try:
+            import sync
+            sync.push()
+        except Exception:
+            pass
+        return 0
 
     if "--status" in sys.argv:
         q = due_cards(cards, state)

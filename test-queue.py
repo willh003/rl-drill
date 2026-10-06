@@ -122,5 +122,27 @@ for mode in ["due", "all", "hardest", "new", "batch", "topic:" + example[0]["cat
         q = drill.select_queue(example, st, mode, NOW)
         check(len(q) <= drill.SESSION_CAP, f"cap broken in mode {mode}")
 
+# --- removed cards never reach a session, and can be restored ---------------
+import tempfile  # noqa: E402
+
+with tempfile.TemporaryDirectory() as tmp:
+    drill.REMOVED = os.path.join(tmp, "removed.json")
+    drill.LOCKFILE = os.path.join(tmp, ".lock")
+    full = drill.load_cards()
+    victim = full[0]["id"]
+    check(drill.load_removed() == set(), "removed set not empty at start")
+    drill.change_removed(add=[victim])
+    live = drill.load_cards()
+    check(victim not in [c["id"] for c in live], "removed card still loaded")
+    check(len(drill.load_cards(include_removed=True)) == len(full),
+          "include_removed lost cards")
+    for mode in ["due", "all", "new", "batch"]:
+        q = drill.select_queue(live, {}, mode, NOW)
+        check(victim not in ids(q), f"removed card served in mode {mode}")
+    drill.change_removed(drop=[victim])
+    check(victim in [c["id"] for c in drill.load_cards()], "restore failed")
+    check(drill.load_removed_map()[victim]["removed"] is False,
+          "restore left no tombstone for sync to carry")
+
 print(f"test-queue.py: {'FAILED, ' + str(len(failures)) + ' failure(s)' if failures else 'all invariants hold'}")
 sys.exit(1 if failures else 0)

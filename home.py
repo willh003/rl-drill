@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The RL Drill home screen.
+"""The Learnmax home screen.
 
     /usr/bin/python3 home.py
 
@@ -12,7 +12,7 @@ a session is on, so the two windows are never on screen competing for the
 keyboard.
 
 The drill itself does not depend on any of this. launchd still runs
-rl-drill.py -> drill.py, and that path never opens the home screen.
+learnmax.py -> drill.py, and that path never opens the home screen.
 """
 
 import json
@@ -28,7 +28,7 @@ import drill    # noqa: E402
 import stats    # noqa: E402
 
 UI = os.path.join(HERE, "home_ui.js")
-APP = os.path.join(HERE, "RLHome.app")
+APP = os.path.join(HERE, "LearnmaxHome.app")
 PAYLOAD_FILE = os.path.join(HERE, ".home-payload.json")
 RESULTS_FILE = os.path.join(HERE, ".home-results.jsonl")
 PIDFILE = os.path.join(HERE, ".home.pid")
@@ -96,7 +96,7 @@ def show_home(landing="home"):
     with open(RESULTS_FILE, "w"):
         pass
 
-    drill.build_app_from(UI, APP, "RL Drill", "local.rl-home")
+    drill.build_app_from(UI, APP, "Learnmax", "local.learnmax-home")
     subprocess.run(["/usr/bin/open", "-n", "-a", APP], check=True,
                    capture_output=True)
 
@@ -121,6 +121,9 @@ def show_home(landing="home"):
             except ValueError:
                 continue
             if msg.get("t") == "cmd" and msg.get("s") == session:
+                if msg.get("cmd") == "edit":
+                    open_editor()       # home stays up; keep waiting
+                    continue
                 return msg
 
         running = drill.app_running(APP)
@@ -140,6 +143,20 @@ def show_home(landing="home"):
     return None
 
 
+def open_editor():
+    """Start the card editor (edit.py) in the background; it opens the browser.
+
+    edit.py notices an editor already running and just reopens the page.
+    """
+    try:
+        subprocess.Popen(["/usr/bin/python3", os.path.join(HERE, "edit.py")],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+        drill.log("opened card editor")
+    except OSError as exc:
+        drill.log(f"could not open card editor ({exc})")
+
+
 def main():
     if already_running():
         drill.log("home screen already open")
@@ -152,8 +169,7 @@ def main():
 
     cards = drill.load_cards()
 
-    # The Dock icon opens on the analytics page: "here is where you are",
-    # with a way into a session from there. Plain `home.py` opens on home.
+    # Opens on home; `--view stats` opens on the analytics page instead.
     landing = "home"
     if "--view" in sys.argv:
         i = sys.argv.index("--view")

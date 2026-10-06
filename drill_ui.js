@@ -1,6 +1,6 @@
-// RL drill -- the window.
+// Learnmax -- the window.
 //
-// This file is the source for RLDrill.app, which drill.py compiles with
+// This file is the source for LearnmaxDrill.app, which drill.py compiles with
 // osacompile and launches with `open`. It also runs directly for development:
 //   osascript -l JavaScript drill_ui.js        (with DRILL_PAYLOAD set)
 //
@@ -157,7 +157,7 @@ var settle = function () {};
 var grabFocus = function () {};
 
 // What a button or key means. Tags double as the NSButton tags.
-var STILL = 0, GOT = 1, SHOW = 2;
+var STILL = 0, GOT = 1, SHOW = 2, REMOVE = 3;
 
 ObjC.registerSubclass({
     name: 'DrillRoot',
@@ -174,6 +174,7 @@ ObjC.registerSubclass({
                 // JXA bridge is not dependable about either one alone.
                 var code = ev.keyCode;
                 if (code === 53) { quit('escape'); return; }      // Escape
+                if (code === 7) { act(REMOVE); return; }          // x
                 if (code === 49 || code === 36 || code === 76) {  // space, return, enter
                     act(SHOW); return;
                 }
@@ -187,6 +188,7 @@ ObjC.registerSubclass({
                 if (ch === '1') act(STILL);
                 else if (ch === '2') act(GOT);
                 else if (ch === ' ') act(SHOW);
+                else if (ch === 'x' || ch === 'X') act(REMOVE);
             }
         }
     }
@@ -262,7 +264,7 @@ var win, root, kicker, footer, agent, app, web;
 var closing = null;     // the "Done" line, built when the session ends
 var btns = {};          // SHOW / STILL / GOT -> {views: [...], sub}
 var cards = [], PAYLOAD = null, SESSION = '';
-var i = 0, right = 0, wrong = 0;
+var i = 0, right = 0, wrong = 0, removedN = 0;
 var revealed = false, finished = false;
 var dues = [];          // epoch seconds produced by this session's answers
 
@@ -380,6 +382,17 @@ act = function (what) {
 
     if (what === SHOW) { if (!revealed) reveal(); return; }
 
+    // "This card isn't useful to me": never shown again, and not graded --
+    // it says nothing about whether you know it. Allowed before or after the
+    // answer is turned over. drill.py records it in removed.json.
+    if (what === REMOVE) {
+        emit({ t: 'remove', id: cards[i].id });
+        removedN++;
+        i++;
+        show();
+        return;
+    }
+
     // Grading is only possible once the answer has been seen. This is the
     // whole point of the flow: a key pressed too early must not count.
     if (!revealed) return;
@@ -415,7 +428,8 @@ function showDone() {
     web.hidden = true;
     kicker.stringValue = '';
 
-    var text = 'Done — ' + right + '/' + (right + wrong) + ' got it';
+    var text = 'Done — ' + right + '/' + (right + wrong) + ' got it' +
+        (removedN ? '   ·   ' + removedN + ' removed' : '');
     closing = label(text, $.NSMakeRect(40, PROMPT_MID - 20, W - 80, 40),
         F_PROMPT, FG, CENTER, true);
     root.addSubview(closing);
@@ -472,7 +486,7 @@ function start() {
         $.NSMakeRect(0, 0, W, H),
         $.NSWindowStyleMaskTitled | $.NSWindowStyleMaskClosable,
         $.NSBackingStoreBuffered, false);
-    win.title = 'RL Drill';
+    win.title = 'Learnmax';
     win.backgroundColor = BG;
     win.releasedWhenClosed = false;
 
@@ -506,6 +520,22 @@ function start() {
                'Still learning', RED, RED);
     makeButton(GOT, $.NSMakeRect(PAD + bw + BTN_GAP, BTN_Y, bw, BTN_H),
                'Got it', GREEN, GREEN);
+
+    // A quiet text link under the buttons: removing a card should be easy to
+    // do and hard to do by accident, so it is small and away from the grades.
+    var rmRect = $.NSMakeRect(W / 2 - 110, 12, 220, 22);
+    var rmLabel = label('Remove this card  ·  x', rmRect, F_SUB, MUTED, CENTER, false);
+    root.addSubview(rmLabel);
+    var rmHit = $.DrillHit.alloc.initWithFrame(rmRect);
+    rmHit.title = '';
+    rmHit.bordered = false;
+    rmHit.transparent = true;
+    rmHit.focusRingType = 1;
+    rmHit.refusesFirstResponder = true;
+    rmHit.tag = REMOVE;
+    rmHit.target = agent;
+    rmHit.action = 'pick:';
+    root.addSubview(rmHit);
 
     // The card face. Pointed at the page by file URL with read access to the
     // webapp directory, which is where KaTeX and its fonts live.

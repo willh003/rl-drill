@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Learnmax editor</title>
+<link rel="stylesheet" href="/web/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/web/card.css">
+<style>
+:root{--bg:#f5f5f7;--fg:#1d1d1f;--muted:#6e6e73;--line:#d2d2d7;--row2:#ececf0;--panel:#fff;--accent:#0a68e0;--bad:#c62828}
+@media(prefers-color-scheme:dark){:root{--bg:#161618;--fg:#f2f2f4;--muted:#9a9aa1;--line:#3a3a3f;--row2:#2a2a2e;--panel:#232326;--accent:#4c9bff;--bad:#ff6b6b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px -apple-system,system-ui,sans-serif}
+.wrap{display:grid;grid-template-columns:300px 1fr;height:100vh}
+aside{border-right:1px solid var(--line);padding:16px;overflow:auto;background:var(--panel)}
+main{padding:20px 24px;overflow:auto}
+h2{font-size:12px;letter-spacing:.08em;color:var(--muted);margin:18px 0 8px;text-transform:uppercase}
+h2:first-child{margin-top:0}
+select,input,textarea,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+textarea{width:100%;font:13.5px ui-monospace,Menlo,monospace;resize:vertical;min-height:110px}
+input{width:100%}
+button{cursor:pointer;background:var(--panel)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--bad)}
+.row{display:flex;gap:8px;margin-bottom:8px}.row>*{flex:1}
+label{display:block;font-size:12px;color:var(--muted);margin:12px 0 4px}
+.list div{padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list div:hover{background:var(--row2)}.list div.sel{background:var(--row2);font-weight:600}
+.prev{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 20px;margin-top:6px}
+.prev .rule{height:1px;background:var(--line);margin:16px 0}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:1000px){.cols{grid-template-columns:1fr}}
+#msg{min-height:20px;margin-top:10px;font-size:13px}.err{color:var(--bad)}.ok{color:var(--muted)}
+.hint{font-size:12px;color:var(--muted)}
+</style></head><body>
+<div class="wrap">
+<aside>
+  <h2>Deck</h2>
+  <select id="deck"></select>
+  <button id="newdeck" style="width:100%;margin-top:8px">+ New deck</button>
+  <h2>Cards in deck <span id="count"></span></h2>
+  <div class="list" id="list"></div>
+</aside>
+<main>
+  <div class="row"><button id="newcard">+ New card</button><span></span></div>
+  <label>Front</label><textarea id="front" placeholder="`v_loss` spikes"></textarea>
+  <label>Back</label><textarea id="back" placeholder="The batch has unusually large returns."></textarea>
+  <div class="row">
+    <div><label>Card id (auto from front; keep stable, it keys your history)</label><input id="id"></div>
+    <div><label>Batch (optional)</label><input id="batch"></div>
+  </div>
+  <p class="hint">$inline$ / $$display$$ math, **bold**, *italic*, `code`, "- " bullets, blank line = new paragraph.</p>
+  <div class="row"><button id="save" class="primary">Save card</button><button id="del" class="danger">Delete</button></div>
+  <div id="msg"></div>
+  <h2>Preview</h2>
+  <div class="prev"><div class="card"><div class="front" id="pf"></div><div class="rule"></div><div class="back" id="pb"></div></div></div>
+</main></div>
+<script src="/web/vendor/katex/katex.min.js"></script>
+<script src="/web/render.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let cards = [], deck = '', editing = null; // editing = id of loaded card, or null
+let idTouched = false;
+
+const slug = s => s.toLowerCase().replace(/`/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+function say(t, bad){ $('msg').textContent = t; $('msg').className = bad ? 'err' : 'ok'; }
+
+async function api(path, body){
+  const r = await fetch(path, body ? {method:'POST', body:JSON.stringify(body)} : {});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+const decks = () => [...new Set(cards.map(c => c.cat))].sort();
+
+function renderDecks(){
+  const ds = decks(); if (deck && !ds.includes(deck)) ds.push(deck);
+  $('deck').innerHTML = ds.map(d => `<option>${d}</option>`).join('');
+  if (!deck) deck = ds[0] || '';
+  $('deck').value = deck;
+}
+function renderList(){
+  const mine = cards.filter(c => c.cat === deck);
+  $('count').textContent = '(' + mine.length + ')';
+  $('list').innerHTML = '';
+  mine.forEach(c => {
+    const d = document.createElement('div');
+    d.textContent = c.front.replace(/\s+/g,' ');
+    d.title = c.id; if (c.id === editing) d.className = 'sel';
+    d.onclick = () => load(c);
+    $('list').appendChild(d);
+  });
+}
+function preview(){
+  $('pf').innerHTML = renderCard($('front').value || '…');
+  $('pb').innerHTML = renderCard($('back').value || '…');
+}
+function blank(){
+  editing = null; idTouched = false;
+  $('front').value = $('back').value = $('id').value = '';
+  const last = cards.filter(c => c.cat === deck).pop();
+  $('batch').value = last ? (last.batch || '') : new Date().toISOString().slice(0,7);
+  say(''); preview(); renderList(); $('front').focus();
+}
+function load(c){
+  editing = c.id; idTouched = true;
+  $('front').value = c.front; $('back').value = c.back;
+  $('id').value = c.id; $('batch').value = c.batch || '';
+  say(''); preview(); renderList();
+}
+function autoId(){
+  if (editing || idTouched) return;
+  const s = slug($('front').value);
+  $('id').value = s ? deck + ':' + s : '';
+}
+$('front').oninput = () => { autoId(); preview(); };
+$('back').oninput = preview;
+$('id').oninput = () => { idTouched = true; };
+$('deck').onchange = () => { deck = $('deck').value; blank(); };
+$('newcard').onclick = blank;
+$('newdeck').onclick = () => {
+  const n = (prompt('New deck name (e.g. rl_prac). Letters, digits, _ or -:') || '').trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(n)) { if (n) say('Invalid deck name', true); return; }
+  deck = n; renderDecks(); blank();
+  say('Deck "' + n + '" is created when you save its first card.');
+};
+$('save').onclick = async () => {
+  try {
+    const card = {id:$('id').value.trim(), front:$('front').value.trim(), back:$('back').value.trim(),
+                  cat:deck, batch:$('batch').value.trim()};
+    if (!deck) throw new Error('make a deck first');
+    cards = await api('/api/save', {card, old_id: editing});
+    const batch = card.batch; renderDecks();
+    say('Saved ' + card.id + '.');
+    blank(); $('batch').value = batch; say('Saved ' + card.id + '.');
+  } catch(e){ say(e.message, true); }
+};
+$('del').onclick = async () => {
+  if (!editing) return say('Select a card in the list first.', true);
+  if (!confirm('Delete ' + editing + '? Its review history stays in state.json but the card is gone.')) return;
+  try { cards = await api('/api/delete', {id: editing}); renderDecks(); blank(); say('Deleted.'); }
+  catch(e){ say(e.message, true); }
+};
+document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') $('save').click(); });
+
+setInterval(() => fetch('/api/ping').catch(() => {}), 10000);
+api('/api/ping').catch(() => {});
+api('/api/cards').then(c => { cards = c; renderDecks(); blank(); });
+</script></body></html>

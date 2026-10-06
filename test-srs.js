@@ -97,6 +97,22 @@ for (let i = 0; i < G.mergeCases.length; i++) {
   }
 }
 
+// ---- removed-card merge parity ----------------------------------------------
+for (let i = 0; i < G.removedCases.length; i++) {
+  const c = G.removedCases[i];
+  const got = SRS.mergeRemoved(c.a, c.b);
+  checked++;
+  if (JSON.stringify(got) !== JSON.stringify(c.merged)) {
+    fail('removed case ' + i + ': got ' + JSON.stringify(got) +
+         ', reference says ' + JSON.stringify(c.merged));
+  }
+}
+const liveIds = SRS.liveCards([{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    { a: { removed: true, ts: 't' }, b: { removed: false, ts: 't' } })
+    .map(c => c.id).join();
+checked++;
+if (liveIds !== 'b,c') fail('liveCards kept ' + liveIds + ', want b,c');
+
 console.log('test-srs: ' + G.vectors.length + ' vectors, ' +
             G.mergeCases.length + ' merge cases, ' + checked +
             ' assertions, ' + failed + ' failure(s)');

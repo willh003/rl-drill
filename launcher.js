@@ -1,9 +1,9 @@
-// Dock / Applications entry point for the RL drill.
+// Dock / Applications entry point for the Learnmax.
 //
-// Compiled into "RL Drill.app" by install.sh, which bakes the drill
-// directory in below. All it does is start home.py on the analytics page and
-// get out of the way -- the windows themselves belong to RLHome.app and
-// RLDrill.app, which home.py opens.
+// Compiled into "Learnmax.app" by install.sh, which bakes the drill
+// directory in below. All it does is start home.py on the home screen and
+// get out of the way -- the windows themselves belong to LearnmaxHome.app and
+// LearnmaxDrill.app, which home.py opens.
 //
 // home.py refuses to start a second copy itself, via a pidfile.
 
@@ -24,7 +24,7 @@ function run() {
     // this launcher's own command line, so it would always match itself and
     // never start anything. home.py enforces the single instance via pidfile.
     var script = 'nohup /usr/bin/python3 ' + HOME +
-                 ' --view stats >/dev/null 2>&1 &';
+                 ' >/dev/null 2>&1 &';
     var task = $.NSTask.alloc.init;
     task.launchPath = '/bin/sh';
     task.arguments = ['-c', script];

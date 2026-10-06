@@ -11,6 +11,7 @@
 # --- Personal data: your deck, your progress -------------------------------
 cards.json
 state.json
+removed.json
 reviews.jsonl
 reviews-phone.jsonl
 .sync-cursor
@@ -31,4 +32,8 @@ cards.backup-*.json
 
 # --- Local install products ------------------------------------------------
 config.json
-com.*.rl-drill.plist
+com.*.learnmax.plist
+
+.claude/*
+.github/*
+docs/claude/*
