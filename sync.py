@@ -144,17 +144,6 @@ def push():
             _put("cards.json", local_cards, sha, "mac: deck update")
             drill.log("[sync] pushed deck update")
 
-        # The paradigm tables ride along the same way: the phone fetches
-        # tables.json from the sync repo for the grid and matching games.
-        tables_file = os.path.join(HERE, "tables.json")
-        if os.path.exists(tables_file):
-            local_tables = open(tables_file).read()
-            text, sha = _get("tables.json")
-            if text is None or (hashlib.sha256(text.encode()).hexdigest() !=
-                                hashlib.sha256(local_tables.encode()).hexdigest()):
-                _put("tables.json", local_tables, sha, "mac: tables update")
-                drill.log("[sync] pushed tables update")
-
         # keep the merged master history available to the phone's stats
         text, sha = _get("reviews.jsonl")
         local_rev = open(drill.REVIEWS).read()

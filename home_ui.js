@@ -1,6 +1,6 @@
-// Levantine Arabic -- home screen and analytics.
+// Recall -- home screen and analytics.
 //
-// Source for ArabicHome.app, compiled by home.py with osacompile and launched
+// Source for RecallHome.app, compiled by home.py with osacompile and launched
 // with `open`. Same constraints as drill_ui.js, for the same reasons:
 //   * no CALayer -- setting a CGColorRef through the JXA bridge crashes with
 //     EXC_ARM_PAC_FAIL, so fills and borders are NSBox
@@ -254,7 +254,7 @@ function sectionLabel(text, top) {
 function buildHome() {
     var pct = S.total ? S.seen / S.total : 0;
 
-    add(label('LEVANTINE ARABIC', $.NSMakeRect(M, T(40, 16), CW, 16),
+    add(label('RECALL', $.NSMakeRect(M, T(40, 16), CW, 16),
         font(11, WT_SEMI), DIM, CENTER, false));
 
     var headline = S.dueNow > 0
@@ -282,7 +282,7 @@ function buildHome() {
     tile($.NSMakeRect(M + 1 * (tw + 12), ty, tw, 82),
          String(S.todayDone), 'DONE TODAY', BLUE);
     tile($.NSMakeRect(M + 2 * (tw + 12), ty, tw, 82),
-         S.todayAccuracy === null ? '—' : S.todayAccuracy + '%', 'TODAY RIGHT',
+         S.todayAccuracy === null ? '—' : S.todayAccuracy + '%', 'TODAY GOT IT',
          S.todayAccuracy === null ? MUTED
              : (S.todayAccuracy >= 80 ? GREEN : (S.todayAccuracy >= 60 ? AMBER : RED)));
     tile($.NSMakeRect(M + 3 * (tw + 12), ty, tw, 82),
@@ -306,19 +306,22 @@ function buildHome() {
 
     sectionLabel('OR CUE SOMETHING SPECIFIC', 418);
 
-    var bw = (CW - 3 * 10) / 4;
-    var by = T(440, 46);
-    var quick = [
-        ['Vocab', S.byCat.vocab ? S.byCat.vocab.total : 0, 'vocab'],
-        ['Sentences', S.byCat.sentences ? S.byCat.sentences.total : 0, 'sentences'],
-        ['Arabic → English', S.dirCounts.ar2en, 'ar2en'],
-        ['English → Arabic', S.dirCounts.en2ar, 'en2ar']
-    ];
-    quick.forEach(function (q, i) {
-        button($.NSMakeRect(M + i * (bw + 10), by, bw, 46),
-            q[0], q[1] + ' cards', { cmd: 'start', mode: q[2] },
-            { size: 13 });
-    });
+    // One button per topic, up to four across (the busiest four if there
+    // are more). A deck with a single topic has nothing to cue by topic, so
+    // the row is left out rather than offering a copy of "Practice".
+    var topics = Object.keys(S.byCat).sort(function (a, b) {
+        return S.byCat[b].total - S.byCat[a].total;
+    }).slice(0, 4).sort();
+    if (topics.length > 1) {
+        var bw = (CW - (topics.length - 1) * 10) / topics.length;
+        var by = T(440, 46);
+        topics.forEach(function (name, i) {
+            var t = S.byCat[name];
+            button($.NSMakeRect(M + i * (bw + 10), by, bw, 46),
+                name, (t.total - t.seen) + ' of ' + t.total + ' still new',
+                { cmd: 'start', mode: 'topic:' + name }, { size: 13 });
+        });
+    }
 
     var hw = (CW - 20) / 3;
     var hy = T(496, 46);
@@ -336,7 +339,7 @@ function buildHome() {
         S.latestTotal
             ? (S.latestTotal - S.latestSeen) + ' of ' + S.latestTotal + ' still new'
             : 'nothing tagged',
-        { cmd: 'start', mode: 'lesson' },
+        { cmd: 'start', mode: 'batch' },
         { size: 13, color: S.latestTotal ? FG : DIM });
 
     button($.NSMakeRect(M, T(566, 44), CW, 44),
@@ -356,7 +359,7 @@ function buildStats() {
     tile($.NSMakeRect(M + 0 * (tw + 12), ty, tw, 82),
          String(S.totalReviews), 'REVIEWS ALL TIME', FG);
     tile($.NSMakeRect(M + 1 * (tw + 12), ty, tw, 82),
-         S.overallAccuracy === null ? '—' : S.overallAccuracy + '%', 'ACCURACY',
+         S.overallAccuracy === null ? '—' : S.overallAccuracy + '%', 'GOT IT',
          S.overallAccuracy === null ? MUTED
              : (S.overallAccuracy >= 80 ? GREEN : (S.overallAccuracy >= 60 ? AMBER : RED)));
     tile($.NSMakeRect(M + 2 * (tw + 12), ty, tw, 82),
@@ -387,7 +390,7 @@ function buildStats() {
         add(label(d.label, $.NSMakeRect(x - 6, base - 20, barW + 12, 14),
             font(10, WT_REG), i === S.history.length - 1 ? FG : DIM, CENTER, false));
     });
-    add(label('green = answered right',
+    add(label('green = got it',
         $.NSMakeRect(M, base - 38, CW, 14), font(10, WT_REG), DIM, CENTER, false));
 
     // Spread of the deck
@@ -429,16 +432,16 @@ function buildStats() {
     if (S.hardest.length) {
         S.hardest.slice(0, 5).forEach(function (h, i) {
             var y = T(748 + i * 26, 20);
-            add(label(h.prompt, $.NSMakeRect(M, y, 250, 18),
+            add(label(h.front, $.NSMakeRect(M, y, CW - 190, 18),
                 font(12, WT_MED), FG, LEFT, false));
-            add(label(h.answer, $.NSMakeRect(M + 258, y, CW - 258 - 96, 18),
-                font(12, WT_REG), MUTED, LEFT, false));
+            add(label(h.cat, $.NSMakeRect(W - M - 190, y, 90, 18),
+                font(12, WT_REG), MUTED, RIGHT, false));
             add(label(h.lapses + (h.lapses === 1 ? ' slip' : ' slips'),
                 $.NSMakeRect(W - M - 90, y, 90, 18),
                 font(12, WT_MED), h.lapses > 2 ? RED : AMBER, RIGHT, false));
         });
     } else {
-        add(label('Every card you have seen, you have got right so far.',
+        add(label('Every card you have seen, you have known so far.',
             $.NSMakeRect(M, T(750, 18), CW, 18), font(12, WT_REG), DIM, LEFT, false));
     }
 
@@ -513,7 +516,7 @@ function start() {
         $.NSMakeRect(0, 0, W, H),
         $.NSWindowStyleMaskTitled | $.NSWindowStyleMaskClosable,
         $.NSBackingStoreBuffered, false);
-    win.title = 'Arabic';
+    win.title = 'Recall';
     win.backgroundColor = BG;
     win.releasedWhenClosed = false;
 

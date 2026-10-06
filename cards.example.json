@@ -1,358 +1,86 @@
 [
   {
-    "id": "vocab:bayt:ar2en",
-    "dir": "ar2en",
-    "prompt": "bayt",
-    "answer": "house",
-    "hint": "",
-    "options": ["house", "water", "bread", "sun"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "math:kl-nonneg",
+    "front": "Prove that $D_{KL}(p\\,\\|\\,q) \\ge 0$.",
+    "back": "**Gibbs' inequality.** Let $p, q$ be distributions on the same finite set, with $q > 0$ wherever $p > 0$.\n\n$$-D_{KL}(p\\|q) = \\sum_x p(x)\\log\\frac{q(x)}{p(x)}$$\n\n$\\log$ is concave, so by Jensen\n\n$$\\sum_x p(x)\\log\\frac{q(x)}{p(x)} \\le \\log\\sum_x p(x)\\frac{q(x)}{p(x)} = \\log\\sum_{x:\\,p(x)>0} q(x) \\le \\log 1 = 0.$$\n\nSo $D_{KL} \\ge 0$. Equality needs Jensen tight, i.e. $q/p$ constant on the support, i.e. $p = q$.",
+    "cat": "math",
+    "batch": "b1"
   },
   {
-    "id": "vocab:bayt:en2ar",
-    "dir": "en2ar",
-    "prompt": "house",
-    "answer": "bayt",
-    "hint": "",
-    "options": ["bayt", "maiy", "khubez", "shams"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "math:jensen",
+    "front": "State Jensen's inequality, and say when equality holds.",
+    "back": "For convex $f$ and a random variable $X$ with finite mean,\n\n$$f(\\mathbb{E}[X]) \\le \\mathbb{E}[f(X)].$$\n\nReversed for concave $f$. Equality iff $f$ is affine on the support of $X$, or $X$ is almost surely constant (for strictly convex $f$, only the latter).",
+    "cat": "math",
+    "batch": "b1"
   },
   {
-    "id": "vocab:maiy:ar2en",
-    "dir": "ar2en",
-    "prompt": "maiy",
-    "answer": "water",
-    "hint": "",
-    "options": ["water", "bread", "sun", "house"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "math:cauchy-schwarz",
+    "front": "Prove Cauchy–Schwarz: $|\\langle u, v\\rangle| \\le \\|u\\|\\|v\\|$.",
+    "back": "If $v = 0$ it is trivial. Otherwise for any real $t$:\n\n$$0 \\le \\|u - tv\\|^2 = \\|u\\|^2 - 2t\\langle u,v\\rangle + t^2\\|v\\|^2.$$\n\nPick $t = \\langle u,v\\rangle / \\|v\\|^2$ (the minimiser):\n\n$$0 \\le \\|u\\|^2 - \\frac{\\langle u,v\\rangle^2}{\\|v\\|^2}.$$\n\nRearrange and take square roots.",
+    "cat": "math",
+    "batch": "b1"
   },
   {
-    "id": "vocab:maiy:en2ar",
-    "dir": "en2ar",
-    "prompt": "water",
-    "answer": "maiy",
-    "hint": "",
-    "options": ["maiy", "khubez", "shams", "bayt"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "math:variance-identity",
+    "front": "Show $\\mathrm{Var}(X) = \\mathbb{E}[X^2] - \\mathbb{E}[X]^2$.",
+    "back": "Let $\\mu = \\mathbb{E}[X]$.\n\n$$\\mathrm{Var}(X) = \\mathbb{E}[(X-\\mu)^2] = \\mathbb{E}[X^2] - 2\\mu\\,\\mathbb{E}[X] + \\mu^2 = \\mathbb{E}[X^2] - \\mu^2.$$\n\nConsequence: $\\mathbb{E}[X^2] \\ge \\mathbb{E}[X]^2$, which is Jensen for $x^2$.",
+    "cat": "math",
+    "batch": "b1"
   },
   {
-    "id": "vocab:khubez:ar2en",
-    "dir": "ar2en",
-    "prompt": "khubez",
-    "answer": "bread",
-    "hint": "",
-    "options": ["bread", "sun", "house", "water"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "ml:bias-variance",
+    "front": "Derive the bias–variance decomposition of expected squared error.",
+    "back": "Let $y = f(x) + \\varepsilon$ with $\\mathbb{E}[\\varepsilon]=0$, $\\mathrm{Var}(\\varepsilon)=\\sigma^2$, and $\\hat f$ trained on a random dataset. At a fixed $x$:\n\n$$\\mathbb{E}\\big[(y-\\hat f)^2\\big] = \\underbrace{\\big(f - \\mathbb{E}\\hat f\\big)^2}_{\\text{bias}^2} + \\underbrace{\\mathrm{Var}(\\hat f)}_{\\text{variance}} + \\underbrace{\\sigma^2}_{\\text{noise}}.$$\n\nProof sketch: add and subtract $\\mathbb{E}\\hat f$ and $f$; every cross term has a factor of a zero-mean quantity that is independent of the rest, so it vanishes.",
+    "cat": "ml",
+    "batch": "b1"
   },
   {
-    "id": "vocab:khubez:en2ar",
-    "dir": "en2ar",
-    "prompt": "bread",
-    "answer": "khubez",
-    "hint": "",
-    "options": ["khubez", "shams", "bayt", "maiy"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "ml:logistic-grad",
+    "front": "What is the gradient of the logistic regression log-loss, and why is it so clean?",
+    "back": "With $\\hat p = \\sigma(w^\\top x)$ and loss $\\ell = -y\\log\\hat p - (1-y)\\log(1-\\hat p)$:\n\n$$\\nabla_w \\ell = (\\hat p - y)\\,x.$$\n\nIt is clean because $\\sigma'(z) = \\sigma(z)(1-\\sigma(z))$ cancels the $1/\\hat p$ and $1/(1-\\hat p)$ from the log terms. Same form as linear regression with squared error (a property of exponential-family GLMs with the canonical link).",
+    "cat": "ml",
+    "batch": "b1"
   },
   {
-    "id": "vocab:shams:ar2en",
-    "dir": "ar2en",
-    "prompt": "shams",
-    "answer": "sun",
-    "hint": "",
-    "options": ["sun", "house", "water", "bread"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "ml:softmax-ce",
+    "front": "Derive $\\partial L/\\partial z_i$ for softmax followed by cross-entropy.",
+    "back": "$p_i = e^{z_i}/\\sum_j e^{z_j}$, $L = -\\sum_k y_k \\log p_k$ with $y$ one-hot.\n\nUse $\\partial p_k/\\partial z_i = p_k(\\delta_{ki} - p_i)$:\n\n$$\\frac{\\partial L}{\\partial z_i} = -\\sum_k \\frac{y_k}{p_k}\\,p_k(\\delta_{ki}-p_i) = -y_i + p_i\\sum_k y_k = p_i - y_i.$$",
+    "cat": "ml",
+    "batch": "b2"
   },
   {
-    "id": "vocab:shams:en2ar",
-    "dir": "en2ar",
-    "prompt": "sun",
-    "answer": "shams",
-    "hint": "",
-    "options": ["shams", "bayt", "maiy", "khubez"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "rl:bellman-expectation",
+    "front": "Write the Bellman expectation equation for $V^\\pi$ and derive it.",
+    "back": "$$V^\\pi(s) = \\sum_a \\pi(a|s)\\sum_{s'} P(s'|s,a)\\big[r(s,a,s') + \\gamma V^\\pi(s')\\big].$$\n\nDerivation: $V^\\pi(s) = \\mathbb{E}_\\pi[G_t \\mid s_t = s]$ and $G_t = r_{t+1} + \\gamma G_{t+1}$. Split the expectation by the first action and next state; by the Markov property the tail $G_{t+1}$ depends only on $s_{t+1}$, giving $\\mathbb{E}[G_{t+1}\\mid s_{t+1}=s'] = V^\\pi(s')$.",
+    "cat": "rl",
+    "batch": "b2"
   },
   {
-    "id": "vocab:wein:ar2en",
-    "dir": "ar2en",
-    "prompt": "wein",
-    "answer": "where",
-    "hint": "question word",
-    "options": ["where", "why", "when", "who"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "rl:contraction",
+    "front": "Prove the Bellman optimality operator is a $\\gamma$-contraction in $\\|\\cdot\\|_\\infty$.",
+    "back": "$(TV)(s) = \\max_a \\big[r(s,a) + \\gamma\\sum_{s'}P(s'|s,a)V(s')\\big]$.\n\nUse $|\\max_a f(a) - \\max_a g(a)| \\le \\max_a |f(a)-g(a)|$:\n\n$$|(TV)(s)-(TU)(s)| \\le \\gamma\\max_a\\sum_{s'}P(s'|s,a)\\,|V(s')-U(s')| \\le \\gamma\\|V-U\\|_\\infty.$$\n\nSo $\\|TV-TU\\|_\\infty \\le \\gamma\\|V-U\\|_\\infty$, and Banach's fixed-point theorem gives a unique $V^*$ and convergence of value iteration at rate $\\gamma^k$.",
+    "cat": "rl",
+    "batch": "b2"
   },
   {
-    "id": "vocab:wein:en2ar",
-    "dir": "en2ar",
-    "prompt": "where",
-    "answer": "wein",
-    "hint": "question word",
-    "options": ["wein", "leish", "eimta", "miin"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "rl:policy-gradient",
+    "front": "Derive the policy gradient theorem (log-derivative trick), in its simplest form.",
+    "back": "Objective $J(\\theta) = \\mathbb{E}_{\\tau\\sim p_\\theta}[R(\\tau)]$.\n\n$$\\nabla_\\theta J = \\int \\nabla_\\theta p_\\theta(\\tau)R(\\tau)\\,d\\tau = \\int p_\\theta(\\tau)\\,\\nabla_\\theta\\log p_\\theta(\\tau)\\,R(\\tau)\\,d\\tau.$$\n\nThe dynamics terms in $\\log p_\\theta(\\tau)$ do not depend on $\\theta$, so\n\n$$\\nabla_\\theta J = \\mathbb{E}_\\tau\\Big[\\sum_t \\nabla_\\theta\\log\\pi_\\theta(a_t|s_t)\\,R(\\tau)\\Big].$$\n\nVariance reduction: replace $R(\\tau)$ by the reward-to-go and subtract a baseline $b(s_t)$; neither changes the expectation.",
+    "cat": "rl",
+    "batch": "b2"
   },
   {
-    "id": "vocab:leish:ar2en",
-    "dir": "ar2en",
-    "prompt": "leish",
-    "answer": "why",
-    "hint": "question word",
-    "options": ["why", "where", "when", "who"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
+    "id": "rl:baseline-unbiased",
+    "front": "Why does subtracting a state-dependent baseline $b(s)$ leave the policy gradient unbiased?",
+    "back": "$$\\mathbb{E}_{a\\sim\\pi}\\big[\\nabla_\\theta\\log\\pi(a|s)\\,b(s)\\big] = b(s)\\sum_a \\nabla_\\theta\\pi(a|s) = b(s)\\,\\nabla_\\theta\\sum_a\\pi(a|s) = b(s)\\,\\nabla_\\theta 1 = 0.$$\n\nIt must not depend on $a$, or it cannot be pulled out of the sum.",
+    "cat": "rl",
+    "batch": "b2"
   },
   {
-    "id": "vocab:leish:en2ar",
-    "dir": "en2ar",
-    "prompt": "why",
-    "answer": "leish",
-    "hint": "question word",
-    "options": ["leish", "wein", "eimta", "miin"],
-    "cat": "vocab",
-    "lesson": "lesson-001-basics"
-  },
-  {
-    "id": "sentences:wein-il-bayt:ar2en",
-    "dir": "ar2en",
-    "prompt": "wein il-bayt?",
-    "answer": "Where is the house?",
-    "hint": "",
-    "options": [
-      "Where is the house?",
-      "Why is the house far?",
-      "Where is the water?",
-      "Is this the house?"
-    ],
-    "cat": "sentences",
-    "lesson": "lesson-002-pronouns"
-  },
-  {
-    "id": "sentences:wein-il-bayt:en2ar",
-    "dir": "en2ar",
-    "prompt": "Where is the house?",
-    "answer": "wein il-bayt?",
-    "hint": "",
-    "options": [
-      "wein il-bayt?",
-      "leish il-bayt b3iid?",
-      "wein il-maiy?",
-      "hayda il-bayt?"
-    ],
-    "cat": "sentences",
-    "lesson": "lesson-002-pronouns"
-  },
-  {
-    "id": "sentences:bidi-maiy:ar2en",
-    "dir": "ar2en",
-    "prompt": "bidi maiy, law samaHt",
-    "answer": "I want water, please",
-    "hint": "law samaHt = please (to a man)",
-    "options": [
-      "I want water, please",
-      "I want bread, please",
-      "He wants water now",
-      "Do you want water?"
-    ],
-    "cat": "sentences",
-    "lesson": "lesson-002-pronouns"
-  },
-  {
-    "id": "sentences:bidi-maiy:en2ar",
-    "dir": "en2ar",
-    "prompt": "I want water, please",
-    "answer": "bidi maiy, law samaHt",
-    "hint": "law samaHt = please (to a man)",
-    "options": [
-      "bidi maiy, law samaHt",
-      "bidi khubez, law samaHt",
-      "bado maiy halla2",
-      "bidak maiy?"
-    ],
-    "cat": "sentences",
-    "lesson": "lesson-002-pronouns"
-  },
-  {
-    "id": "vocab:ana:en2ar",
-    "dir": "en2ar",
-    "prompt": "I",
-    "answer": "ana",
-    "hint": "pronoun",
-    "options": ["ana", "inta", "huwwe", "niHna"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:inta:en2ar",
-    "dir": "en2ar",
-    "prompt": "you (to a man)",
-    "answer": "inta",
-    "hint": "pronoun",
-    "options": ["inta", "inti", "intu", "ana"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:inti:en2ar",
-    "dir": "en2ar",
-    "prompt": "you (to a woman)",
-    "answer": "inti",
-    "hint": "pronoun",
-    "options": ["inti", "inta", "hiyye", "intu"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:huwwe:en2ar",
-    "dir": "en2ar",
-    "prompt": "he",
-    "answer": "huwwe",
-    "hint": "pronoun",
-    "options": ["huwwe", "hiyye", "hinne", "ana"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:hiyye:en2ar",
-    "dir": "en2ar",
-    "prompt": "she",
-    "answer": "hiyye",
-    "hint": "pronoun",
-    "options": ["hiyye", "huwwe", "hinne", "inti"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:niHna:en2ar",
-    "dir": "en2ar",
-    "prompt": "we",
-    "answer": "niHna",
-    "hint": "pronoun",
-    "options": ["niHna", "intu", "hinne", "ana"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:intu:en2ar",
-    "dir": "en2ar",
-    "prompt": "you (plural)",
-    "answer": "intu",
-    "hint": "pronoun",
-    "options": ["intu", "inta", "niHna", "hinne"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:hinne:en2ar",
-    "dir": "en2ar",
-    "prompt": "they",
-    "answer": "hinne",
-    "hint": "pronoun",
-    "options": ["hinne", "huwwe", "hiyye", "intu"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beiti:en2ar",
-    "dir": "en2ar",
-    "prompt": "my house",
-    "answer": "beiti",
-    "hint": "beit + -i",
-    "options": ["beiti", "beitak", "beito", "beitna"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beitak:en2ar",
-    "dir": "en2ar",
-    "prompt": "your house (a man's)",
-    "answer": "beitak",
-    "hint": "beit + -ak",
-    "options": ["beitak", "beitik", "beitkon", "beiti"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beitik:en2ar",
-    "dir": "en2ar",
-    "prompt": "your house (a woman's)",
-    "answer": "beitik",
-    "hint": "beit + -ik",
-    "options": ["beitik", "beitak", "beita", "beitkon"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beito:en2ar",
-    "dir": "en2ar",
-    "prompt": "his house",
-    "answer": "beito",
-    "hint": "beit + -o",
-    "options": ["beito", "beita", "beiton", "beiti"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beita:en2ar",
-    "dir": "en2ar",
-    "prompt": "her house",
-    "answer": "beita",
-    "hint": "beit + -a",
-    "options": ["beita", "beito", "beiton", "beitik"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beitna:en2ar",
-    "dir": "en2ar",
-    "prompt": "our house",
-    "answer": "beitna",
-    "hint": "beit + -na",
-    "options": ["beitna", "beitkon", "beiton", "beiti"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beitkon:en2ar",
-    "dir": "en2ar",
-    "prompt": "your house (plural)",
-    "answer": "beitkon",
-    "hint": "beit + -kon",
-    "options": ["beitkon", "beitak", "beitna", "beiton"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
-  },
-  {
-    "id": "vocab:beiton:en2ar",
-    "dir": "en2ar",
-    "prompt": "their house",
-    "answer": "beiton",
-    "hint": "beit + -on",
-    "options": ["beiton", "beito", "beita", "beitkon"],
-    "cat": "vocab",
-    "lesson": "lesson-002-pronouns",
-    "deliver": "table"
+    "id": "rl:td-vs-mc",
+    "front": "Compare TD(0) and Monte Carlo value estimates: bias, variance, and why.",
+    "back": "- **MC** target $G_t$: unbiased for $V^\\pi(s_t)$, high variance (sums many random rewards and transitions).\n- **TD(0)** target $r + \\gamma V(s')$: biased while $V$ is wrong (it bootstraps), low variance (one random step).\n\nTD can update online, mid-episode, and exploits the Markov property; MC does not need it. $n$-step returns and $\\mathrm{TD}(\\lambda)$ interpolate between them.",
+    "cat": "rl",
+    "batch": "b2"
   }
 ]

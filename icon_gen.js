@@ -24,13 +24,13 @@ rgb(70, 70, 78).set;
 path.lineWidth = S * 0.007;
 path.stroke;
 
-// Arabic ayn as the hero mark, optically centred a little above middle so the
+// A sigma as the hero mark, optically centred a little above middle so the
 // card stack below it has room to breathe.
 var attrs = $.NSMutableDictionary.alloc.init;
 attrs.setObjectForKey($.NSFont.systemFontOfSizeWeight(S * 0.40, $.NSFontWeightMedium),
                       $.NSFontAttributeName);
 attrs.setObjectForKey(rgb(242, 242, 247), $.NSForegroundColorAttributeName);
-var glyph = $.NSString.alloc.initWithUTF8String('ع');
+var glyph = $.NSString.alloc.initWithUTF8String('Σ');
 var gs = glyph.sizeWithAttributes(attrs);
 glyph.drawAtPointWithAttributes(
     $.NSMakePoint((S - gs.width) / 2, S * 0.60 - gs.height / 2), attrs);

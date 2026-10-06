@@ -18,15 +18,7 @@ reviews-phone.jsonl
 .drill-*
 .home-*
 .home.pid
-tables.json
-webapp/tables.json
 webapp/config.json
-
-# --- Third-party deck exports (not redistributable) ------------------------
-*.apkg
-*.ankiaddon
-All Decksanki-export.txt
-arabic-*.txt
 
 # --- Logs, backups, build artifacts ----------------------------------------
 *.log

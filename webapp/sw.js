@@ -2,9 +2,32 @@
 // offline, from the last sync), and turns Web Push messages from the Mac
 // into native notifications.
 'use strict';
-const CACHE = 'arabic-v2';
-const SHELL = ['./', './index.html', './srs.js', './config.json',
-               './manifest.webmanifest', './icon-180.png', './icon-512.png'];
+const CACHE = 'recall-v1';
+const SHELL = ['./', './index.html', './srs.js', './render.js', './card.css',
+               './config.json', './manifest.webmanifest',
+               './icon-180.png', './icon-512.png',
+               './vendor/katex/katex.min.js', './vendor/katex/katex.min.css',
+               // Offline math: the fonts are what makes it look like math.
+               './vendor/katex/fonts/KaTeX_AMS-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Caligraphic-Bold.woff2',
+               './vendor/katex/fonts/KaTeX_Caligraphic-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Fraktur-Bold.woff2',
+               './vendor/katex/fonts/KaTeX_Fraktur-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Main-Bold.woff2',
+               './vendor/katex/fonts/KaTeX_Main-BoldItalic.woff2',
+               './vendor/katex/fonts/KaTeX_Main-Italic.woff2',
+               './vendor/katex/fonts/KaTeX_Main-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Math-BoldItalic.woff2',
+               './vendor/katex/fonts/KaTeX_Math-Italic.woff2',
+               './vendor/katex/fonts/KaTeX_SansSerif-Bold.woff2',
+               './vendor/katex/fonts/KaTeX_SansSerif-Italic.woff2',
+               './vendor/katex/fonts/KaTeX_SansSerif-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Script-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Size1-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Size2-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Size3-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Size4-Regular.woff2',
+               './vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))
@@ -30,7 +53,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let data = {};
   try { data = e.data.json(); } catch (err) {}
-  e.waitUntil(self.registration.showNotification(data.title || 'Arabic', {
+  e.waitUntil(self.registration.showNotification(data.title || 'Recall', {
     body: data.body || '',
     icon: './icon-180.png',
     badge: './icon-180.png',

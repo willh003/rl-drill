@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-Levantine Arabic drill
-======================
+Recall drill
+============
 
-One window. One card. Four options. Click one, or press 1-4.
+One window. One card. Read the front, say the answer to yourself, press space
+to turn it over, then say whether you had it: 2 for "got it", 1 for "still
+learning". A card is a question or a concept on the front and an answer or a
+proof sketch on the back, written with $LaTeX$ where it helps.
 
 Owns its own spaced repetition -- no Anki, no add-ons, no browser. Card data
 lives in cards.json next to this file; scheduling state in state.json.
 
 Scheduling is SM-2 with same-day learning steps, which is the shape the
 research supports: short reinforcement on the day you first meet a card, then
-intervals that expand. Getting one wrong drops it back to the first step and
-shaves the ease factor, so troublesome cards come round more often.
+intervals that expand. "Got it" counts as a correct answer and advances the
+card; "still learning" drops it back to the first step and shaves the ease
+factor, so troublesome cards come round more often. The scheduler does not
+know the difference between self-graded and multiple-choice -- grade() takes
+a boolean either way.
 
 The window itself lives in drill_ui.js and is drawn by osascript, not by
 Tkinter. This is not a preference. The system Tk that /usr/bin/python3 links
@@ -20,7 +26,9 @@ binary was built for 26.x; the Command Line Tools python3 is built against the
 14.4 SDK, so `tkinter.Tk()` aborts with SIGABRT before a window can exist.
 With pip and venv ruled out there is no Python-side fix, so the UI is built
 with AppKit through osascript's ObjC bridge -- also part of the base system,
-also no installs.
+also no installs. The card text itself is shown in a WKWebView, because
+that is the only thing on the base system that can typeset math (KaTeX,
+vendored under webapp/vendor).
 
 There is deliberately no osascript-dialog fallback. When one was here, a
 failure part-way through a session left a stack of modal `choose from list`
@@ -33,8 +41,7 @@ Run with no arguments to study whatever is due.
   --preview MODE  print the cards a session would serve, in order
   --minutes N     crank: nonstop rounds until N minutes have passed
   --mode MODE     study a chosen slice instead of what's due
-                  (due, all, vocab, sentences, ar2en, en2ar, hardest, new,
-                   lesson)
+                  (due, all, hardest, new, batch, or topic:NAME)
   --demo          open the window on sample cards without touching state.json
 """
 
@@ -51,7 +58,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CARDS = os.path.join(HERE, "cards.json")
 STATE = os.path.join(HERE, "state.json")
 UI = os.path.join(HERE, "drill_ui.js")
-APP = os.path.join(HERE, "ArabicDrill.app")
+APP = os.path.join(HERE, "RecallDrill.app")
 PAYLOAD_FILE = os.path.join(HERE, ".drill-payload.json")
 RESULTS_FILE = os.path.join(HERE, ".drill-results.jsonl")
 LOG = os.path.join(HERE, "drill.log")
@@ -76,33 +83,19 @@ MAX_INTERVAL_MIN = 180 * 24 * 60
 # Cards shown in a single sitting before it stops on its own.
 SESSION_CAP = 20
 
-# Fewest cards between the two directions of the same item, when a session is
-# short enough that both have to appear at all.
-SIBLING_MIN_GAP = 6
-
 # How many never-seen cards one sitting may introduce. The rest of the session
-# is review. Without this a session can be eleven brand-new items at once,
-# which is where the backlog came from -- meeting them is not learning them.
+# is review. Without this a session can be a dozen brand-new proofs at once,
+# which is where the backlog comes from -- meeting them is not learning them.
 NEW_PER_SESSION = 12
 
 # ...but never introduce *nothing*. Reviews are taken first, so once the
 # backlog passes SESSION_CAP the leftovers run out and new material stops
-# entirely -- a whole day can go by meeting no new words while you grind
+# entirely -- a whole day can go by meeting no new material while you grind
 # through cards you already know. These slots are held back for new cards and
 # the oldest reviews wait a session instead. Set to 0 to go strictly
 # backlog-first.
 NEW_RESERVED = 6
 
-# Below this, a session is too thin to be worth opening a window for, and only
-# then is it worth showing both directions of the same item. Padding a healthy
-# session with buried siblings just to reach the cap reintroduces the leak.
-MIN_SESSION = 5
-
-# Cards scoring within this of the best are treated as equally good, and one
-# is taken at random. Strict best-first produces a perfect ar2en/en2ar/ar2en
-# alternation, which is as predictable as the deck order it replaced. Kept
-# below the same-item penalty, so siblings still never come round together.
-ORDER_SLACK = 5
 
 
 def log(msg):
@@ -115,21 +108,14 @@ def log(msg):
         pass
 
 
-def load_cards(for_drill=True):
-    """The deck.
+def load_cards():
+    """The deck: a JSON array of {id, front, back, cat, batch?}.
 
-    Cards tagged deliver="table" belong to a paradigm (the pronouns and the
-    possessive endings) that the phone teaches as a grid and a matching round
-    instead of as isolated multiple-choice. They keep their schedule, their
-    history and their ids -- they are simply not handed out as flashcards, so
-    a paradigm is met as a system rather than sixteen unrelated facts.
-    Pass for_drill=False when you need the whole deck (stats, sync, tables).
+    `cat` is the topic ("rl", "math", "ml"...) and `batch` tags a group added
+    together, so "the newest stuff" is answerable without guessing.
     """
     with open(CARDS) as fh:
-        cards = json.load(fh)
-    if for_drill:
-        return [c for c in cards if c.get("deliver") != "table"]
-    return cards
+        return json.load(fh)
 
 
 def load_state():
@@ -158,7 +144,6 @@ def record_review(card, correct, now=None):
                 "id": card["id"],
                 "correct": bool(correct),
                 "cat": card.get("cat", ""),
-                "dir": card.get("dir", ""),
             }) + "\n")
     except OSError:
         pass
@@ -230,143 +215,36 @@ def due_cards(cards, state, now=None):
     return out
 
 
-def base_of(card_id):
-    """The item a card belongs to, without its direction.
+def order_queue(pairs, cap=SESSION_CAP, new_cap=None):
+    """Arrange a session: reviews first, then new material.
 
-    "vocab:ahlan:ar2en" and "vocab:ahlan:en2ar" are two tests of one item.
-    """
-    return card_id.rsplit(":", 1)[0]
-
-
-def _preferred_dir(base):
-    """Which way round to introduce an item, fixed per item.
-
-    Deterministic rather than random so an item is always introduced the same
-    way, but varying across items so the deck does not read as ar2en-first
-    the whole way down.
-    """
-    return "en2ar" if sum(ord(ch) for ch in base) % 2 else "ar2en"
-
-
-def _penalty(cand, out, gap):
-    """How badly a card fits as the next one. Lower is better."""
-    card = cand[0]
-    p = 0
-
-    # Never test the same item twice close together: the first showing hands
-    # you the answer to the second.
-    b = base_of(card["id"])
-    recent = out[-gap:]
-    for i, prev in enumerate(reversed(recent)):
-        if base_of(prev[0]["id"]) == b:
-            p += 100 * (gap - i)
-
-    if out:
-        last = out[-1][0]
-        if last.get("dir") == card.get("dir"):
-            p += 4
-        if last.get("cat") == card.get("cat"):
-            p += 1
-        if last.get("lesson") == card.get("lesson"):
-            p += 1
-    if len(out) >= 2 and out[-1][0].get("dir") == card.get("dir") \
-            and out[-2][0].get("dir") == card.get("dir"):
-        p += 8                      # three of the same direction in a row
-
-    return p
-
-
-def order_queue(pairs, cap=SESSION_CAP, gap=SIBLING_MIN_GAP, new_cap=None):
-    """Arrange a session so it doesn't feel like reading down a list.
-
-    Two problems with serving the queue in deck order. The pair of cards for
-    one item sit next to each other, so the second is free -- you have just
-    read its answer. And whole runs share a direction, which turns the drill
-    into "translate from Arabic" for ten cards and then "translate to Arabic"
-    for ten more.
-
-    So: keep only one direction per item where there is room to (the reverse
-    is earned in a later session), then lay the rest out greedily, preferring
-    a card that differs from what just went by. The backlog-before-new rule
-    is applied within tiers, so it still holds.
+    `pairs` arrives most-overdue first (due_cards sorts that way), so taking
+    the head of it clears the oldest backlog first. The reviews that make the
+    cut are then shuffled, so a session does not replay the deck in the order
+    you last saw it -- that order is a cue, and recall should come from the
+    question. New cards stay in deck order: a batch is usually written
+    foundations-first, and meeting a proof before its definitions is not
+    learning.
     """
     if not pairs:
         return []
 
-    def arrange(tier):
-        """One card per item, choosing directions so the mix stays even.
+    seen = [p for p in pairs if p[1]["reps"] > 0]
+    fresh = [p for p in pairs if p[1]["reps"] == 0]
 
-        Both siblings are due, so which one to show now is a presentation
-        choice, not a scheduling one -- the other stays due and leads the next
-        session. Picking the under-represented direction each time is what
-        stops a session being ten translations one way then ten the other.
-        """
-        order, by_base = [], {}
-        for card, entry in tier:
-            b = base_of(card["id"])
-            if b not in by_base:
-                by_base[b] = []
-                order.append(b)
-            by_base[b].append((card, entry))
-
-        primary, held = [], []
-        used = {"ar2en": 0, "en2ar": 0}
-        for b in order:
-            options = by_base[b]
-            if len(options) == 1:
-                pick = options[0]
-            else:
-                pick = min(options, key=lambda ce: (
-                    used.get(ce[0].get("dir"), 0),
-                    0 if ce[0].get("dir") == _preferred_dir(b) else 1))
-            primary.append(pick)
-            used[pick[0].get("dir")] = used.get(pick[0].get("dir"), 0) + 1
-            held.extend(ce for ce in options if ce is not pick)
-        return primary, held
-
-    seen_primary, seen_held = arrange([p for p in pairs if p[1]["reps"] > 0])
-    new_primary, new_held = arrange([p for p in pairs if p[1]["reps"] == 0])
-
-    # The tiers are arranged separately, so an item with one direction already
-    # reviewed and the other never seen comes out of both. Let the review side
-    # keep it; the unseen direction waits for a later session.
-    reviewed = {base_of(c["id"]) for c, _ in seen_primary}
-    new_held += [ce for ce in new_primary if base_of(ce[0]["id"]) in reviewed]
-    new_primary = [ce for ce in new_primary
-                   if base_of(ce[0]["id"]) not in reviewed]
-
-    # Fill from one-per-item first. Only if that cannot fill the session do
-    # siblings come back, and the spacing rule keeps them apart.
     limit_new = NEW_PER_SESSION if new_cap is None else new_cap
-    picked = seen_primary[:cap]
-    room_for_new = min(cap - len(picked), limit_new)
+    picked_seen = seen[:cap]
+    room_for_new = min(cap - len(picked_seen), limit_new)
 
     # Hold slots back for new material when reviews would otherwise fill the
     # session. The displaced reviews stay due and lead the next one.
-    if new_primary and room_for_new < min(NEW_RESERVED, limit_new):
-        picked = seen_primary[:max(0, cap - NEW_RESERVED)]
-        room_for_new = min(cap - len(picked), limit_new)
+    if fresh and room_for_new < min(NEW_RESERVED, limit_new):
+        picked_seen = seen[:max(0, cap - NEW_RESERVED)]
+        room_for_new = min(cap - len(picked_seen), limit_new)
 
-    if room_for_new > 0:
-        picked += new_primary[:room_for_new]
-
-    # Only a genuinely thin session is worth padding with the reverse cards.
-    if len(picked) < MIN_SESSION:
-        for extra in (seen_held, new_held):
-            if len(picked) < cap:
-                picked += extra[:cap - len(picked)]
-
-    # Interleave within each tier, so reviews still come before new material.
-    out = []
-    for tier in ([p for p in picked if p[1]["reps"] > 0],
-                 [p for p in picked if p[1]["reps"] == 0]):
-        remaining = list(tier)
-        while remaining:
-            scored = [(_penalty(cand, out, gap), i) for i, cand in enumerate(remaining)]
-            best = min(s for s, _ in scored)
-            near = [i for s, i in scored if s <= best + ORDER_SLACK]
-            out.append(remaining.pop(random.choice(near)))
-    return out
+    picked_new = fresh[:room_for_new] if room_for_new > 0 else []
+    random.shuffle(picked_seen)
+    return picked_seen + picked_new
 
 
 def select_queue(cards, state, mode="due", now=None, new_cap=None):
@@ -376,16 +254,18 @@ def select_queue(cards, state, mode="due", now=None, new_cap=None):
     Everything else is you overriding it from the home screen -- practice on
     demand, which deliberately ignores the due dates but still grades and
     reschedules normally.
+
+    Modes: due, all, hardest, new, batch (the most recently added group), and
+    "topic:NAME" for one `cat`.
     """
     now = now or datetime.now()
 
     if mode == "due":
         return order_queue(due_cards(cards, state, now), new_cap=new_cap)
 
-    if mode in ("vocab", "sentences"):
-        pool = [c for c in cards if c.get("cat") == mode]
-    elif mode in ("ar2en", "en2ar"):
-        pool = [c for c in cards if c.get("dir") == mode]
+    if mode.startswith("topic:"):
+        topic = mode.split(":", 1)[1]
+        pool = [c for c in cards if c.get("cat") == topic]
     elif mode == "hardest":
         pool = sorted(
             cards,
@@ -395,11 +275,9 @@ def select_queue(cards, state, mode="due", now=None, new_cap=None):
         pool = [c for c in pool if entry_for(state, c["id"])["lapses"] > 0]
     elif mode == "new":
         pool = [c for c in cards if entry_for(state, c["id"])["reps"] == 0]
-    elif mode == "lesson":
-        # Whatever was added most recently. cards.json tags each batch with a
-        # lesson id, so "the new stuff" is answerable without guessing.
-        tags = sorted({c.get("lesson", "") for c in cards if c.get("lesson")})
-        pool = [c for c in cards if c.get("lesson") == tags[-1]] if tags else []
+    elif mode == "batch":
+        tags = sorted({c.get("batch", "") for c in cards if c.get("batch")})
+        pool = [c for c in cards if c.get("batch") == tags[-1]] if tags else []
     else:
         pool = list(cards)
 
@@ -476,9 +354,6 @@ def human_delta(when, now=None):
 # UI
 # --------------------------------------------------------------------------
 
-KICKERS = {"ar2en": "CHOOSE THE MEANING", "en2ar": "CHOOSE THE ARABIC"}
-
-
 def epoch(when):
     return round(when.timestamp())
 
@@ -488,18 +363,15 @@ def build_payload(cards, state, queue, now):
 
     The two `dueIf*` values let the closing screen name the next due time
     without a round trip: grade() is pure, so both outcomes are known here.
+    "Right" is "got it"; "wrong" is "still learning".
     """
     items = []
     for card, entry in queue:
-        opts = list(card["options"])
-        random.shuffle(opts)
         items.append({
             "id": card["id"],
-            "kicker": KICKERS.get(card["dir"], "CHOOSE THE ANSWER"),
-            "prompt": card["prompt"],
-            "answer": card["answer"],
-            "hint": card.get("hint") or "",
-            "options": opts,
+            "cat": card.get("cat", ""),
+            "front": card["front"],
+            "back": card["back"],
             "dueIfRight": epoch(
                 datetime.fromisoformat(grade(entry, True, now)["due"])),
             "dueIfWrong": epoch(
@@ -514,8 +386,8 @@ def build_payload(cards, state, queue, now):
     }
 
 
-def build_app_from(source, dest, display="Arabic Drill",
-                   bundle_id="local.arabic-drill"):
+def build_app_from(source, dest, display="Recall Drill",
+                   bundle_id="local.recall-drill"):
     """Compile a JXA source file into an .app, if it is missing or stale.
 
     The window has to be a LaunchServices app or macOS will not give it the
@@ -763,14 +635,10 @@ def main():
         mode = sys.argv[i + 1] if len(sys.argv) > i + 1 else "due"
         queue = select_queue(cards, state, mode)
         print(f"{mode}: {len(queue)} card(s)")
-        bases = {}
         for n, (card, entry) in enumerate(queue, 1):
-            b = base_of(card["id"])
-            note = "" if b not in bases else f"  <- same item as #{bases[b]}"
-            bases.setdefault(b, n)
             tag = "new" if entry["reps"] == 0 else f"rep{entry['reps']}"
-            print(f"  {n:2d}. {card['dir']:5s} {card['cat']:9s} {tag:5s} "
-                  f"{card['prompt'][:38]:38s}{note}")
+            front = " ".join(card["front"].split())
+            print(f"  {n:2d}. {card.get('cat', ''):8s} {tag:5s} {front[:60]}")
         return 0
 
     if "--demo" in sys.argv:

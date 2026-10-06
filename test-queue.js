@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Queue-building invariants for webapp/srs.js -- the same scenarios as
-// test-queue.py runs against drill.py. The builders are randomised on
-// purpose (ORDER_SLACK), so every scenario runs many times.
+// test-queue.py runs against drill.py. The builders shuffle on purpose, so
+// every scenario runs many times.
 
 'use strict';
 process.env.TZ = 'UTC';
@@ -18,46 +18,44 @@ function check(cond, msg) {
   if (!cond) { failures++; console.error('FAIL: ' + msg); }
 }
 
-function makeDeck(nItems) {
+function makeDeck(n) {
+  const topics = ['rl', 'math', 'ml'];
   const cards = [];
-  for (let i = 0; i < nItems; i++) {
-    const base = 'item' + String(i).padStart(2, '0');
-    for (const d of ['ar2en', 'en2ar']) {
-      cards.push({ id: 'vocab:' + base + ':' + d, dir: d,
-                   prompt: 'p' + i + d, answer: 'a' + i + d, hint: '',
-                   options: ['a' + i + d, 'x', 'y', 'z'], cat: 'vocab',
-                   lesson: 'L1' });
-    }
+  for (let i = 0; i < n; i++) {
+    cards.push({ id: topics[i % 3] + ':item' + String(i).padStart(2, '0'),
+                 front: 'q' + i, back: 'a' + i, cat: topics[i % 3],
+                 batch: i < n / 2 ? 'b1' : 'b2' });
   }
   return cards;
 }
 
-function seenEntry(minutesAgo, reps) {
-  minutesAgo = minutesAgo === undefined ? 60 : minutesAgo;
-  return { due: SRS.iso(new Date(NOW.getTime() - minutesAgo * 60000)),
-           step: 3, interval_min: 1440, ease: 2.5,
-           reps: reps === undefined ? 3 : reps, lapses: 0 };
+function seenEntry(minutesAgo, dueIn) {
+  const t = dueIn !== undefined ? NOW.getTime() + dueIn * 60000
+      : NOW.getTime() - (minutesAgo === undefined ? 60 : minutesAgo) * 60000;
+  return { due: SRS.iso(new Date(t)), step: 3, interval_min: 1440,
+           ease: 2.5, reps: 3, lapses: 0 };
 }
 
-const bases = q => q.map(p => SRS.baseOf(p[0].id));
-function minSameBaseGap(q) {
-  const last = {};
-  let gap = q.length;
-  bases(q).forEach((b, i) => {
-    if (b in last) gap = Math.min(gap, i - last[b]);
-    last[b] = i;
-  });
-  return gap;
-}
+const ids = q => q.map(p => p[0].id);
+const sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
 
-// --- healthy session: big seen backlog --------------------------------------
-const deck = makeDeck(26);
+// --- big seen backlog: capped, no repeats -----------------------------------
+const deck = makeDeck(30);
 const state = {};
 for (const c of deck) state[c.id] = seenEntry();
 for (let t = 0; t < TRIALS; t++) {
   const q = SRS.selectQueue(deck, state, 'due', NOW);
   check(q.length === SRS.SESSION_CAP, 'cap: got ' + q.length);
-  check(new Set(bases(q)).size === q.length, 'healthy session repeats an item');
+  check(new Set(ids(q)).size === q.length, 'a card was served twice');
+}
+
+// --- the oldest backlog is what makes the cut -------------------------------
+const stateAged = {};
+deck.forEach((c, i) => { stateAged[c.id] = seenEntry(60 + i); });
+const oldest = deck.slice(-SRS.SESSION_CAP).map(c => c.id);
+for (let t = 0; t < TRIALS; t++) {
+  check(sameSet(ids(SRS.selectQueue(deck, stateAged, 'due', NOW)), oldest),
+        'a newer review displaced an older one');
 }
 
 // --- all-new deck: the drip -------------------------------------------------
@@ -66,59 +64,63 @@ for (let t = 0; t < TRIALS; t++) {
   check(q.length === SRS.NEW_PER_SESSION,
         'new drip: got ' + q.length + ', want ' + SRS.NEW_PER_SESSION);
   check(q.every(p => p[1].reps === 0), 'non-new card in an all-new deck');
-  check(new Set(bases(q)).size === q.length, 'new session repeats an item');
+  check(ids(q).join() === deck.slice(0, SRS.NEW_PER_SESSION).map(c => c.id).join(),
+        'new cards left deck order');
 }
 
 // --- mixed: backlog first, but new cards keep their reserved slots ----------
-const deckMixed = makeDeck(28);
+const deckMixed = makeDeck(40);
 const stateMixed = {};
-deckMixed.forEach((c, i) => {
-  if (c.id.split(':')[1] < 'item18') stateMixed[c.id] = seenEntry(60 + i);
-});
+deckMixed.slice(0, 25).forEach((c, i) => { stateMixed[c.id] = seenEntry(60 + i); });
 for (let t = 0; t < TRIALS; t++) {
   const q = SRS.selectQueue(deckMixed, stateMixed, 'due', NOW);
   const nNew = q.filter(p => p[1].reps === 0).length;
   check(q.length === SRS.SESSION_CAP, 'mixed cap: got ' + q.length);
   check(nNew === SRS.NEW_RESERVED,
         'mixed: ' + nNew + ' new, want the ' + SRS.NEW_RESERVED + ' reserved');
-  const seenFlags = q.map(p => p[1].reps > 0 ? 1 : 0);
-  check(seenFlags.join('') === seenFlags.slice().sort((a, b) => b - a).join(''),
+  const flags = q.map(p => p[1].reps > 0 ? 1 : 0);
+  check(flags.join('') === flags.slice().sort((a, b) => b - a).join(''),
         'a new card came before a review');
 }
 
-// --- thin session: siblings return, spread as far as possible ---------------
-const deckThin = makeDeck(4);
-const stateThin = {};
-for (const c of deckThin) stateThin[c.id] = seenEntry();
-for (let t = 0; t < TRIALS; t++) {
-  const q = SRS.selectQueue(deckThin, stateThin, 'due', NOW);
-  check(q.length === 8, 'thin session: got ' + q.length + ', want all 8');
-  check(minSameBaseGap(q) >= 3,
-        'thin session: siblings ' + minSameBaseGap(q) + ' apart');
-}
+// --- due mode serves only what is due ---------------------------------------
+const stateFuture = {};
+for (const c of deck) stateFuture[c.id] = seenEntry(0, 600);
+stateFuture[deck[0].id] = seenEntry();
+check(ids(SRS.selectQueue(deck, stateFuture, 'due', NOW)).join() === deck[0].id,
+      'due mode served something that is not due');
 
-// --- deliver:"table" never drills, in any mode ------------------------------
-const exampleAll = JSON.parse(fs.readFileSync(
-    path.join(__dirname, 'cards.example.json')));
-const tableIds = new Set(exampleAll.filter(c => c.deliver === 'table')
-                                   .map(c => c.id));
-check(tableIds.size > 0, 'example deck has no table cards');
-check(SRS.drillable(exampleAll).every(c => c.deliver !== 'table'),
-      'drillable() let a table card through');
+// --- every practice mode serves what its name says --------------------------
 const lapsed = {};
-for (const c of exampleAll) {
-  lapsed[c.id] = Object.assign(seenEntry(), { lapses: 2, ease: 2.1 });
+for (const c of deck.slice(0, 6)) {
+  lapsed[c.id] = Object.assign(seenEntry(0, 600), { lapses: 2, ease: 2.1 });
 }
-const modes = ['due', 'all', 'vocab', 'sentences', 'ar2en', 'en2ar',
-               'hardest', 'new', 'lesson'];
-for (const mode of modes) {
-  for (const st of [{}, lapsed]) {
-    for (let t = 0; t < 10; t++) {
-      const q = SRS.selectQueue(exampleAll, st, mode, NOW);
-      check(!q.some(p => tableIds.has(p[0].id)),
-            'table card drilled in mode ' + mode);
-      check(q.length <= SRS.SESSION_CAP, 'cap broken in mode ' + mode);
-    }
+for (let t = 0; t < TRIALS / 4; t++) {
+  for (const topic of ['rl', 'math', 'ml']) {
+    const q = SRS.selectQueue(deck, {}, 'topic:' + topic, NOW);
+    check(q.length && q.every(p => p[0].cat === topic), 'topic:' + topic);
+  }
+  let q = SRS.selectQueue(deck, {}, 'batch', NOW);
+  check(q.length && q.every(p => p[0].batch === 'b2'), 'batch is not the latest');
+  q = SRS.selectQueue(deck, lapsed, 'hardest', NOW);
+  check(sameSet(ids(q), Object.keys(lapsed)), 'hardest');
+  q = SRS.selectQueue(deck, lapsed, 'new', NOW);
+  check(q.length && q.every(p => !(p[0].id in lapsed)), 'new served a seen card');
+  q = SRS.selectQueue(deck, {}, 'all', NOW);
+  check(q.length <= SRS.SESSION_CAP && new Set(ids(q)).size === q.length, 'all');
+}
+check(SRS.selectQueue(deck, {}, 'topic:nope', NOW).length === 0, 'unknown topic');
+
+// --- the example deck loads and every mode copes with it --------------------
+const example = JSON.parse(fs.readFileSync(
+    path.join(__dirname, 'cards.example.json')));
+check(example.length > 0, 'example deck is empty');
+const lapsedAll = {};
+for (const c of example) lapsedAll[c.id] = Object.assign(seenEntry(), { lapses: 2 });
+for (const mode of ['due', 'all', 'hardest', 'new', 'batch', 'topic:' + example[0].cat]) {
+  for (const st of [{}, lapsedAll]) {
+    check(SRS.selectQueue(example, st, mode, NOW).length <= SRS.SESSION_CAP,
+          'cap broken in mode ' + mode);
   }
 }
 

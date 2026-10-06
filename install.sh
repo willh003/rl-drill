@@ -16,7 +16,7 @@ PLIST="$AGENTS/local.arabic-drill.plist"
 
 [ -f "$DIR/cards.json" ] || {
   echo "No cards.json here yet. Copy cards.example.json to cards.json"
-  echo "(and tables.example.json to tables.json) or write your own deck first."
+  echo "or write your own deck first."
   exit 1
 }
 
@@ -31,14 +31,14 @@ echo "  fires hourly 08:00-22:00; exits silently when nothing is due"
 # --- Dock launcher (optional but nice) --------------------------------------
 # A compiled applet, because a bare osascript process launched any other way
 # never receives keyboard focus on macOS.
-APP="$DIR/Levantine Arabic.app"
+APP="$DIR/Recall.app"
 TMP_DIR="$(mktemp -d -t launcher)"
 sed "s|__DRILL_DIR__|$DIR|g" "$DIR/launcher.js" > "$TMP_DIR/launcher.js"
 rm -rf "$APP"
 osacompile -s -l JavaScript -o "$APP" "$TMP_DIR/launcher.js"
 rm -rf "$TMP_DIR"
-if [ -f "$DIR/Arabic.icns" ]; then
-  cp "$DIR/Arabic.icns" "$APP/Contents/Resources/applet.icns"
+if [ -f "$DIR/Recall.icns" ]; then
+  cp "$DIR/Recall.icns" "$APP/Contents/Resources/applet.icns"
 fi
 echo "built  $APP"
 echo "  drag it into /Applications if you want it in Launchpad/Spotlight"

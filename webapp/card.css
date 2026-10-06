@@ -1,0 +1,19 @@
+/* How a card looks. Shared by the phone app (index.html) and the Mac window
+   (card.html inside a WKWebView), so the two cannot drift apart. */
+.card{font-size:19px;line-height:1.5;color:var(--fg);word-wrap:break-word;
+      overflow-wrap:anywhere}
+.card p{margin:0 0 .75em}
+.card p:last-child,.card ul:last-child,.card ol:last-child{margin-bottom:0}
+.card ul,.card ol{margin:0 0 .75em;padding-left:1.35em}
+.card li{margin:.2em 0}
+.card code{font:.88em ui-monospace,Menlo,monospace;background:var(--row2);
+           padding:.08em .35em;border-radius:5px}
+.card b{font-weight:600}
+.card .katex{font-size:1.06em}
+.card .katex-display{margin:.7em 0;overflow-x:auto;overflow-y:hidden;
+                     padding:.15em 0}
+.card .front{font-size:23px;font-weight:500}
+.card .rule{height:1px;background:var(--line);margin:20px 0}
+.card .back{color:var(--fg)}
+.card .back-label{font-size:11px;font-weight:600;letter-spacing:.08em;
+                  color:var(--muted);margin-bottom:10px}

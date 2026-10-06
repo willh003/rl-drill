@@ -1,6 +1,6 @@
 {
-  "name": "Arabic",
-  "short_name": "Arabic",
+  "name": "Recall",
+  "short_name": "Recall",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

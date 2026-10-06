@@ -44,6 +44,13 @@ BUCKET_LABEL = {
 }
 
 
+def _plain(text):
+    """A card front as one line of plain text, for lists. Math stays as its
+    LaTeX source -- the native window cannot typeset it."""
+    t = " ".join(text.replace("$", "").split())
+    return t if len(t) <= 78 else t[:77] + "…"
+
+
 def streak(reviews, now=None):
     """Consecutive days up to today with at least one review.
 
@@ -131,29 +138,25 @@ def compute(cards, state, reviews, now=None):
 
     lapses_by_card.sort(key=lambda t: (-t[0], t[1]))
     hardest = [{
-        "prompt": c["prompt"],
-        "answer": c["answer"],
+        "front": _plain(c["front"]),
+        "cat": c.get("cat", ""),
         "lapses": n,
         "ease": round(ease, 2),
     } for n, ease, c in lapses_by_card[:6]]
 
     nxt = drill.next_due_at(cards, state, now)
 
-    dir_counts = Counter(c.get("dir", "") for c in cards)
-
-    tags = sorted({c.get("lesson", "") for c in cards if c.get("lesson")})
+    tags = sorted({c.get("batch", "") for c in cards if c.get("batch")})
     latest = tags[-1] if tags else None
-    latest_cards = [c for c in cards if c.get("lesson") == latest] if latest else []
+    latest_cards = [c for c in cards if c.get("batch") == latest] if latest else []
     latest_seen = sum(1 for c in latest_cards
                       if drill.entry_for(state, c["id"])["reps"] > 0)
 
     return {
         "sessionCap": drill.SESSION_CAP,
-        "latestLesson": latest,
+        "latestBatch": latest,
         "latestTotal": len(latest_cards),
         "latestSeen": latest_seen,
-        "dirCounts": {"ar2en": dir_counts.get("ar2en", 0),
-                      "en2ar": dir_counts.get("en2ar", 0)},
         "total": total,
         "seen": seen,
         "dueNow": due_now,
@@ -179,8 +182,7 @@ def compute(cards, state, reviews, now=None):
 
 
 def snapshot(now=None):
-    # analytics describe the whole deck, including table-delivered cards
-    cards = drill.load_cards(for_drill=False)
+    cards = drill.load_cards()
     state = drill.load_state()
     return compute(cards, state, drill.load_reviews(), now)
 
@@ -188,7 +190,7 @@ def snapshot(now=None):
 def main():
     s = snapshot()
     pct = round(100 * s["seen"] / s["total"]) if s["total"] else 0
-    print(f"Levantine Arabic — {s['seen']}/{s['total']} cards started ({pct}%)")
+    print(f"Recall — {s['seen']}/{s['total']} cards started ({pct}%)")
     print(f"  due now        {s['dueNow']}")
     print(f"  today          {s['todayDone']} reviews"
           + (f", {s['todayAccuracy']}% right" if s["todayAccuracy"] is not None else ""))
@@ -202,7 +204,7 @@ def main():
     if s["hardest"]:
         print("  giving trouble:")
         for h in s["hardest"]:
-            print(f"    {h['lapses']}x  {h['prompt']}  ->  {h['answer']}")
+            print(f"    {h['lapses']}x  {h['front'][:70]}")
     return 0
 
 

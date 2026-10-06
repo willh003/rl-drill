@@ -28,6 +28,9 @@ jobs:
       - name: queue invariants, ported side
         run: node test-queue.js
 
+      - name: card text renderer
+        run: node test-render.js
+
       - name: web push encryption against the RFC 8291 test vector
         run: node push-send.js --test
 

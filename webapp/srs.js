@@ -13,11 +13,8 @@ const SRS = {
   EASE_PENALTY: 0.2,
   MAX_INTERVAL_MIN: 180 * 24 * 60,
   SESSION_CAP: 20,
-  SIBLING_MIN_GAP: 6,
   NEW_PER_SESSION: 12,
   NEW_RESERVED: 6,
-  MIN_SESSION: 5,
-  ORDER_SLACK: 5,
 
   // Local-time ISO without milliseconds, matching Python's isoformat --
   // the two sides must produce comparable strings.
@@ -77,23 +74,10 @@ const SRS = {
     return out;
   },
 
-  baseOf(id) { return id.slice(0, id.lastIndexOf(':')); },
-
-  // Cards tagged deliver:"table" are a paradigm the grid and the matching
-  // round teach as a system. They keep their schedule and their history --
-  // they are just never handed out as isolated multiple-choice.
-  drillable(cards) { return cards.filter(c => c.deliver !== 'table'); },
-
-  preferredDir(base) {
-    let s = 0;
-    for (const ch of base) s += ch.codePointAt(0);
-    return s % 2 ? 'en2ar' : 'ar2en';
-  },
-
   dueCards(cards, state, now) {
     const nowIso = SRS.iso(now);
     const out = [];
-    for (const c of SRS.drillable(cards)) {
+    for (const c of cards) {
       const e = SRS.entryFor(state, c.id);
       if (e.due <= nowIso) out.push([c, e]);
     }
@@ -105,106 +89,43 @@ const SRS = {
     return out;
   },
 
-  penalty(cand, out, gap) {
-    const card = cand[0];
-    let p = 0;
-    const b = SRS.baseOf(card.id);
-    const recent = out.slice(-gap);
-    for (let i = 0; i < recent.length; i++) {
-      const prev = recent[recent.length - 1 - i];
-      if (SRS.baseOf(prev[0].id) === b) p += 100 * (gap - i);
+  shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
-    if (out.length) {
-      const last = out[out.length - 1][0];
-      if (last.dir === card.dir) p += 4;
-      if (last.cat === card.cat) p += 1;
-      if ((last.lesson || '') === (card.lesson || '')) p += 1;
-    }
-    if (out.length >= 2 &&
-        out[out.length - 1][0].dir === card.dir &&
-        out[out.length - 2][0].dir === card.dir) p += 8;
-    return p;
+    return a;
   },
 
-  orderQueue(pairs, cap, gap, newCap) {
+  // Reviews first, then new material -- see order_queue in drill.py.
+  orderQueue(pairs, cap, newCap) {
     cap = cap || SRS.SESSION_CAP;
-    gap = gap || SRS.SIBLING_MIN_GAP;
     if (!pairs.length) return [];
-
-    const arrange = tier => {
-      const order = [], byBase = {};
-      for (const [card, entry] of tier) {
-        const b = SRS.baseOf(card.id);
-        if (!byBase[b]) { byBase[b] = []; order.push(b); }
-        byBase[b].push([card, entry]);
-      }
-      const primary = [], held = [], used = { ar2en: 0, en2ar: 0 };
-      for (const b of order) {
-        const options = byBase[b];
-        let pick = options[0];
-        if (options.length > 1) {
-          const pref = SRS.preferredDir(b);
-          pick = options.slice().sort((x, y) =>
-            (used[x[0].dir] - used[y[0].dir]) ||
-            ((x[0].dir === pref ? 0 : 1) - (y[0].dir === pref ? 0 : 1)))[0];
-        }
-        primary.push(pick);
-        used[pick[0].dir] = (used[pick[0].dir] || 0) + 1;
-        for (const ce of options) if (ce !== pick) held.push(ce);
-      }
-      return [primary, held];
-    };
-
-    const [seenPrimary, seenHeld] = arrange(pairs.filter(p => p[1].reps > 0));
-    let [newPrimary, newHeld] = arrange(pairs.filter(p => p[1].reps === 0));
-
-    const reviewed = new Set(seenPrimary.map(p => SRS.baseOf(p[0].id)));
-    newHeld = newHeld.concat(newPrimary.filter(p => reviewed.has(SRS.baseOf(p[0].id))));
-    newPrimary = newPrimary.filter(p => !reviewed.has(SRS.baseOf(p[0].id)));
+    const seen = pairs.filter(p => p[1].reps > 0);
+    const fresh = pairs.filter(p => p[1].reps === 0);
 
     const limitNew = (newCap === undefined || newCap === null)
         ? SRS.NEW_PER_SESSION : newCap;
-    let picked = seenPrimary.slice(0, cap);
-    let room = Math.min(cap - picked.length, limitNew);
-    if (newPrimary.length && room < Math.min(SRS.NEW_RESERVED, limitNew)) {
-      picked = seenPrimary.slice(0, Math.max(0, cap - SRS.NEW_RESERVED));
-      room = Math.min(cap - picked.length, limitNew);
+    let pickedSeen = seen.slice(0, cap);
+    let room = Math.min(cap - pickedSeen.length, limitNew);
+    if (fresh.length && room < Math.min(SRS.NEW_RESERVED, limitNew)) {
+      pickedSeen = seen.slice(0, Math.max(0, cap - SRS.NEW_RESERVED));
+      room = Math.min(cap - pickedSeen.length, limitNew);
     }
-    if (room > 0) picked = picked.concat(newPrimary.slice(0, room));
-    if (picked.length < SRS.MIN_SESSION) {
-      for (const extra of [seenHeld, newHeld]) {
-        if (picked.length < cap) {
-          picked = picked.concat(extra.slice(0, cap - picked.length));
-        }
-      }
-    }
-
-    const out = [];
-    for (const tier of [picked.filter(p => p[1].reps > 0),
-                        picked.filter(p => p[1].reps === 0)]) {
-      const remaining = tier.slice();
-      while (remaining.length) {
-        const scored = remaining.map((cand, i) => [SRS.penalty(cand, out, gap), i]);
-        const best = Math.min(...scored.map(s => s[0]));
-        const near = scored.filter(s => s[0] <= best + SRS.ORDER_SLACK)
-                           .map(s => s[1]);
-        const pick = near[Math.floor(Math.random() * near.length)];
-        out.push(remaining.splice(pick, 1)[0]);
-      }
-    }
-    return out;
+    const pickedNew = room > 0 ? fresh.slice(0, room) : [];
+    return SRS.shuffle(pickedSeen).concat(pickedNew);
   },
 
+  // Modes: due, all, hardest, new, batch, and "topic:NAME".
   selectQueue(cards, state, mode, now) {
     now = now || new Date();
-    cards = SRS.drillable(cards);
     if (mode === 'due') return SRS.orderQueue(SRS.dueCards(cards, state, now));
 
     let pool;
-    if (mode === 'vocab' || mode === 'sentences') {
-      pool = cards.filter(c => c.cat === mode);
-    } else if (mode === 'ar2en' || mode === 'en2ar') {
-      pool = cards.filter(c => c.dir === mode);
+    if (mode.startsWith('topic:')) {
+      const topic = mode.slice(6);
+      pool = cards.filter(c => c.cat === topic);
     } else if (mode === 'hardest') {
       pool = cards.slice().sort((a, b) => {
         const ea = SRS.entryFor(state, a.id), eb = SRS.entryFor(state, b.id);
@@ -212,27 +133,21 @@ const SRS = {
       }).filter(c => SRS.entryFor(state, c.id).lapses > 0);
     } else if (mode === 'new') {
       pool = cards.filter(c => SRS.entryFor(state, c.id).reps === 0);
-    } else if (mode === 'lesson') {
-      const tags = [...new Set(cards.map(c => c.lesson).filter(Boolean))].sort();
+    } else if (mode === 'batch') {
+      const tags = [...new Set(cards.map(c => c.batch).filter(Boolean))].sort();
       const latest = tags[tags.length - 1];
-      pool = latest ? cards.filter(c => c.lesson === latest) : [];
+      pool = latest ? cards.filter(c => c.batch === latest) : [];
     } else {
       pool = cards.slice();
     }
 
     if (mode !== 'hardest') {
       const dueIds = new Set(SRS.dueCards(cards, state, now).map(p => p[0].id));
-      const head = pool.filter(c => dueIds.has(c.id));
-      const tail = pool.filter(c => !dueIds.has(c.id));
-      for (let i = tail.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [tail[i], tail[j]] = [tail[j], tail[i]];
-      }
-      pool = head.concat(tail);
+      pool = pool.filter(c => dueIds.has(c.id))
+                 .concat(SRS.shuffle(pool.filter(c => !dueIds.has(c.id))));
     }
     return SRS.orderQueue(pool.map(c => [c, SRS.entryFor(state, c.id)]),
-                          undefined, undefined,
-                          mode === 'new' ? SRS.SESSION_CAP : undefined);
+                          undefined, mode === 'new' ? SRS.SESSION_CAP : undefined);
   },
 };
 

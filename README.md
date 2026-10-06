@@ -1,48 +1,37 @@
 # arabic-drill
 
-A personal spaced-repetition system for Levantine Arabic with zero
-dependencies: no Anki, no server, no npm install, no pip install. A Mac
-shows you a card at scheduled hours; an iPhone web app drills the same
-deck anywhere; the two stay in sync through a private GitHub repo; and
-real lock-screen push notifications arrive when enough cards are due.
+(Born as a Levantine Arabic drill, now a recall trainer for reinforcement
+learning, math and ML — hence the repo name.)
+
+A personal spaced-repetition system for things you have to *reproduce*,
+not just recognise: a definition, a derivation, a proof sketch. A card
+is a question on the front and an answer on the back, written in
+LaTeX where it helps. You try to recall it, turn the card over, and say
+honestly whether you had it. Zero dependencies: no Anki, no server, no
+npm install, no pip install. A Mac shows you a card at scheduled hours;
+an iPhone web app drills the same deck anywhere; the two stay in sync
+through a private GitHub repo; and real lock-screen push notifications
+arrive when enough cards are due.
 
 Built for one learner and published as-is. The deck format is generic —
-swap the content and it drills anything with a prompt, an answer and
-four options.
+swap the content and it drills anything with a front and a back.
 
-## What it looks like
+## How a session works
 
-The Mac, at a scheduled hour — one window, one card, four options,
-keys 1–4. A wrong answer shows the right one and the hint, then moves
-on:
+1. The front appears — say, *"Prove that $D_{KL}(p\|q) \ge 0$."* — and
+   you answer it to yourself, on paper if it's a proof.
+2. Press **space** (or tap **Show answer**). The back appears under the
+   front, typeset with KaTeX.
+3. Say whether you had it. **Got it** (key `2`) counts as a correct
+   answer and moves the card to its next, longer interval. **Still
+   learning** (key `1`) sends it back to ten minutes and lowers its ease,
+   so it comes round more often. Each button tells you what it will do
+   ("again in 10 min", "next in 1 d").
 
-<p align="center">
-  <img src="screenshots/drill-graded.png" width="520"
-       alt="Desktop drill window: a graded card with the wrong pick in red and the correct answer in green">
-</p>
-
-The home screen and its analytics page:
-
-<p align="center">
-  <img src="screenshots/home.png" width="390"
-       alt="Desktop home window: due count, streak, and session mode buttons">
-  <img src="screenshots/stats.png" width="390"
-       alt="Desktop analytics window: 14-day bar chart, deck spread, upcoming load, trouble cards">
-</p>
-
-The same deck on the phone — drill, paradigm grid, and matching round,
-all feeding the same schedule:
-
-<p align="center">
-  <img src="screenshots/phone-home.png" width="190"
-       alt="Phone home screen with due count and session modes">
-  <img src="screenshots/phone-graded.png" width="190"
-       alt="Phone drill with a graded card">
-  <img src="screenshots/phone-grid.png" width="190"
-       alt="Paradigm grid mid-game: pronouns, endings and possessed forms placed by person">
-  <img src="screenshots/phone-match.png" width="190"
-       alt="Matching round: persons against pronouns, both sides shuffled">
-</p>
+You cannot grade a card you have not turned over — the point is to try
+first. Being honest with yourself is the whole mechanism: grade "got
+it" only if you could have produced the answer, not merely recognised it
+once you saw it.
 
 ## How it fits together
 
@@ -65,14 +54,14 @@ flowchart TB
 
     subgraph phone["iPhone — home-screen web app"]
         direction TB
-        app["index.html + srs.js<br/>drill, grid, matching"]
+        app["index.html + srs.js<br/>drill, KaTeX cards"]
         sw["sw.js<br/>offline shell, notifications"]
     end
 
     subgraph repo["private GitHub repo — the only shared state"]
         direction LR
         state["state.json<br/>per-card schedule"]
-        cards["cards.json<br/>tables.json<br/>the deck"]
+        cards["cards.json<br/>the deck"]
         hist["reviews.jsonl<br/>reviews-phone.jsonl<br/>answer history"]
         sub["push-<br/>subscription.json"]
     end
@@ -154,12 +143,14 @@ sequenceDiagram
 
 ### The scheduler
 
-The scheduler is SM-2 with same-day learning steps:
+The scheduler is SM-2 with same-day learning steps. It only ever sees a
+boolean — "got it" is correct, "still learning" is wrong — so it does
+not care that you are the judge:
 
 * learning steps 10 min → 30 min → 2 h, then graduation to 1 day,
   then `interval *= ease`
 * ease starts at 2.5, floor 1.3, −0.2 per lapse
-* a wrong answer resets to the first step
+* "still learning" resets to the first step
 * intervals cap at 180 days
 
 An unbroken correct streak walks exactly:
@@ -190,34 +181,31 @@ notifications, since the Mac is what sends those.)
 ```
 cp config.example.json config.json          # fill in as you go below
 cp cards.example.json cards.json
-cp tables.example.json tables.json
 ```
 
-Edit `cards.json`. Each card:
+Edit `cards.json`, a JSON array. Each card:
 
 ```json
 {
-  "id": "vocab:bayt:ar2en",       // cat:item:direction — the two directions
-  "dir": "ar2en",                 //   of one item share the cat:item prefix
-  "prompt": "bayt",
-  "answer": "house",
-  "hint": "",                     // shown after a wrong answer
-  "options": ["house", "water", "bread", "sun"],   // exactly 4, incl. answer
-  "cat": "vocab",                 // "vocab" or "sentences"
-  "lesson": "lesson-001-basics",  // batches; "Latest batch" studies the last
-  "deliver": "table"              // optional: teach via the paradigm grid,
-}                                 //   never as a flashcard
+  "id": "math:kl-nonneg",     // unique and stable: it keys your schedule
+  "front": "Prove that $D_{KL}(p\\|q) \\ge 0$.",
+  "back": "**Gibbs' inequality.** By Jensen ...\n\n$$ ... $$",
+  "cat": "math",              // topic; the home screen gets a button per topic
+  "batch": "2026-10-rl-basics" // optional; "Latest batch" studies the last
+}
 ```
 
-Pick distractors from the same semantic group so nothing is guessable by
-elimination. Cards tagged `deliver: "table"` belong to a paradigm the
-phone teaches as a grid and a matching round instead of as isolated
-multiple-choice — `tables.example.json` shows the shape, and its
-`cardId` cells must point at cards in your deck. Keep the paradigm keys
-`pron`, `ending`, `book`; the app refers to them by name. Then:
+Card text is a small markdown: `$inline$` and `$$display$$` math (KaTeX),
+`**bold**`, `*italic*`, `` `code` ``, `- bullets`, `1. numbers`, a blank
+line for a new paragraph, and `\$` for a literal dollar sign. Inside
+JSON every backslash is doubled — `"\\frac{a}{b}"` — and `validate-deck.py`
+catches the usual slips (an unbalanced `$`, or a lone `\b`/`\f`/`\t`
+that JSON swallowed as a control character). Keep each card to one
+idea: a proof sketch you can say in a minute is a card; a whole lecture
+is ten. Changing a card's `id` resets its history.
 
 ```
-python3 validate-deck.py cards.json tables.json
+python3 validate-deck.py cards.json
 ```
 
 ### 2. The Mac drill (works with no GitHub at all)
@@ -230,9 +218,9 @@ sh install.sh                          # hourly launchd job + Dock launcher
 ```
 
 Other modes: `--preview MODE` prints the session a mode would serve;
-`--minutes N` cranks nonstop rounds; `--mode vocab|sentences|ar2en|
-en2ar|hardest|new|lesson|all` studies a slice; `--demo` opens the
-window without touching your schedule. Most scheduled firings find
+`--minutes N` cranks nonstop rounds; `--mode due|all|hardest|new|batch|
+topic:NAME` studies a slice; `--demo` opens the window without touching
+your schedule. Most scheduled firings find
 nothing due and exit silently — that is by design.
 
 ### 3. The private sync repo
@@ -243,8 +231,8 @@ gh repo create YOURUSER/arabic-drill-sync --private
 ```
 
 Put `syncRepo` in `config.json`. The Mac now pulls/pushes around every
-session and uploads your `cards.json` and `tables.json` whenever they
-change. Nothing else to seed.
+session and uploads your `cards.json` whenever it
+changes. Nothing else to seed.
 
 ### 4. The phone app
 
@@ -302,6 +290,7 @@ python3 gen-golden.py     # regenerate vectors from the reference
 node test-srs.js          # scheduler parity, field-exact
 python3 test-queue.py     # session invariants, reference side
 node test-queue.js        # session invariants, ported side
+node test-render.js       # card text renderer
 node push-send.js --test  # RFC 8291 known-answer vector
 python3 validate-deck.py  # deck shape
 ```
@@ -327,21 +316,31 @@ debugging; do not "fix" them.
   it — a missing parseInt once made every answer grade as correct);
   `NSTextAlignment` is UIKit-ordered (centre = 1);
   `$.NSDefaultRunLoopMode` is undefined.
+* **The card face is a WKWebView, and native code never calls into
+  it.** JXA cannot build the completion-handler block that
+  `evaluateJavaScript` wants, and a nil one crashes the process when
+  WebKit invokes it. So `drill_ui.js` hands each card to
+  `webapp/card.html` in the URL fragment (a fragment-only navigation
+  fires `hashchange` without reloading). The web view also refuses
+  first responder, or clicking the text would take the keyboard from
+  space / 1 / 2.
+* **KaTeX is vendored** under `webapp/vendor/katex` (woff2 fonts only)
+  so math works offline on both devices; the service worker caches it.
+  Bump `CACHE` in `sw.js` if you change the shell.
 * **Session tokens** in the payload/results files stop a dying
   window's parting line being read as the next session's result.
 * **`fcntl.flock` in `commit_answer`:** two frontends can grade
   concurrently; every commit re-reads state under an exclusive lock,
   changes one key, writes back.
 * **`body { overflow: hidden }`** in the PWA is deliberate; each
-  scrollable screen has its own scroller. The class `.tile` belongs to
-  the home stat tiles; the table game uses `.gtile` for exactly that
-  reason.
+  scrollable screen has its own scroller (the card pane scrolls so a
+  long proof never pushes the answer buttons off the screen).
 * **The scheduler is done.** SM-2 here is tested, characterised and
   deliberately boring. Improvements welcome elsewhere.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The example deck and tables are original
+MIT — see [LICENSE](LICENSE). The example deck is original
 to this repository and covered by the same license. If you build a deck
-from a textbook or someone else's Anki export, that content is theirs:
-study from it privately, don't redistribute it.
+from a textbook or someone else's notes, that content is theirs: study
+from it privately, don't redistribute it.

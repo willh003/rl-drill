@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The Levantine Arabic home screen.
+"""The Recall home screen.
 
     /usr/bin/python3 home.py
 
@@ -28,7 +28,7 @@ import drill    # noqa: E402
 import stats    # noqa: E402
 
 UI = os.path.join(HERE, "home_ui.js")
-APP = os.path.join(HERE, "ArabicHome.app")
+APP = os.path.join(HERE, "RecallHome.app")
 PAYLOAD_FILE = os.path.join(HERE, ".home-payload.json")
 RESULTS_FILE = os.path.join(HERE, ".home-results.jsonl")
 PIDFILE = os.path.join(HERE, ".home.pid")
@@ -39,15 +39,17 @@ HOME_TIMEOUT = 60 * 60
 MODE_NAMES = {
     "due": "what's due",
     "all": "the whole deck",
-    "vocab": "vocab",
-    "sentences": "sentences",
-    "ar2en": "Arabic to English",
-    "en2ar": "English to Arabic",
     "hardest": "trouble cards",
     "new": "new cards",
-    "lesson": "the latest batch",
+    "batch": "the latest batch",
     "timed30": "a 30-minute crank",
 }
+
+
+def mode_name(mode):
+    if mode.startswith("topic:"):
+        return "topic " + mode.split(":", 1)[1]
+    return MODE_NAMES.get(mode, mode)
 
 
 def already_running():
@@ -94,7 +96,7 @@ def show_home(landing="home"):
     with open(RESULTS_FILE, "w"):
         pass
 
-    drill.build_app_from(UI, APP, "Arabic", "local.arabic-home")
+    drill.build_app_from(UI, APP, "Recall", "local.recall-home")
     subprocess.run(["/usr/bin/open", "-n", "-a", APP], check=True,
                    capture_output=True)
 
@@ -181,7 +183,7 @@ def main():
             drill.log(f"nothing to study for '{mode}'")
             continue
 
-        drill.log(f"session from home screen: {MODE_NAMES.get(mode, mode)}, "
+        drill.log(f"session from home screen: {mode_name(mode)}, "
                   f"{len(queue)} card(s)")
         try:
             result = drill.run_window(cards, state, mode=mode)

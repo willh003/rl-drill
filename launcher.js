@@ -1,9 +1,9 @@
-// Dock / Applications entry point for the Levantine Arabic drill.
+// Dock / Applications entry point for the Recall drill.
 //
-// Compiled into "Levantine Arabic.app" by install.sh, which bakes the drill
+// Compiled into "Recall.app" by install.sh, which bakes the drill
 // directory in below. All it does is start home.py on the analytics page and
-// get out of the way -- the windows themselves belong to ArabicHome.app and
-// ArabicDrill.app, which home.py opens.
+// get out of the way -- the windows themselves belong to RecallHome.app and
+// RecallDrill.app, which home.py opens.
 //
 // home.py refuses to start a second copy itself, via a pidfile.
 

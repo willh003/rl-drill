@@ -1,6 +1,6 @@
-// Levantine Arabic drill -- the window.
+// Recall drill -- the window.
 //
-// This file is the source for ArabicDrill.app, which drill.py compiles with
+// This file is the source for RecallDrill.app, which drill.py compiles with
 // osacompile and launches with `open`. It also runs directly for development:
 //   osascript -l JavaScript drill_ui.js        (with DRILL_PAYLOAD set)
 //
@@ -26,11 +26,17 @@
 //    either -- exec'ing osascript makes osascript the main executable and the
 //    bundle identity is lost.
 //
+// 4. The card text is typeset by a WKWebView showing webapp/card.html (KaTeX,
+//    vendored). AppKit cannot draw math. The web view is display-only: it
+//    refuses first responder so the keys keep going to DrillRoot, and every
+//    button is native, as before. Math is the only reason it is here.
+//
 // drill.py owns all the scheduling. This file owns pixels and keystrokes, and
 // appends one JSON line per answer to the results file as it goes, so grading
 // is persisted while the session runs rather than only at the end.
 
 ObjC.import('Cocoa');
+ObjC.import('WebKit');
 
 // ---------------------------------------------------------------- plumbing
 
@@ -109,15 +115,17 @@ var RED = rgb(255, 69, 58);
 var LEFT = 0, CENTER = 1;
 var BOX_CUSTOM = 4, NO_TITLE = 0;
 
-var W = 640, H = 460;
-var PAD = 60, ROW_W = W - PAD * 2, ROW_H = 46, ROW_GAP = 10;
-var ROW_TOP = 292;                    // top edge of the first option row
-var PROMPT_MID = 356;                 // prompt block is centred on this line
+var W = 760, H = 680;
+var PAD = 40;
+var BTN_Y = 44, BTN_H = 56, BTN_GAP = 14;
+var FOOT_Y = 112;
+var WEB_Y = 140, WEB_TOP = 70;        // web view spans WEB_Y .. H - WEB_TOP
+var PROMPT_MID = 380;                 // the closing line is centred on this
 
 var F_KICKER = $.NSFont.systemFontOfSizeWeight(11, $.NSFontWeightSemibold);
 var F_PROMPT = $.NSFont.systemFontOfSizeWeight(28, $.NSFontWeightMedium);
-var F_LETTER = $.NSFont.systemFontOfSizeWeight(13, $.NSFontWeightSemibold);
-var F_OPT = $.NSFont.systemFontOfSizeWeight(15, $.NSFontWeightRegular);
+var F_BTN = $.NSFont.systemFontOfSizeWeight(16, $.NSFontWeightSemibold);
+var F_SUB = $.NSFont.systemFontOfSizeWeight(12, $.NSFontWeightRegular);
 var F_FOOT = $.NSFont.systemFontOfSizeWeight(12, $.NSFontWeightRegular);
 
 // ------------------------------------------------------------------ widgets
@@ -140,28 +148,16 @@ function label(text, frame, font, color, align, wrap) {
     return t;
 }
 
-function textHeight(text, font, width) {
-    try {
-        var attrs = $.NSDictionary.dictionaryWithObjectForKey(
-            font, $.NSFontAttributeName);
-        var r = $.NSString.alloc.initWithUTF8String(text)
-            .boundingRectWithSizeOptionsAttributes(
-                $.NSMakeSize(width, 400), 1 /* UsesLineFragmentOrigin */, attrs);
-        return Math.ceil(r.size.height) + 8;
-    } catch (e) {
-        var perLine = Math.max(1, Math.floor(width / (font.pointSize * 0.52)));
-        return Math.ceil(text.length / perLine) * (font.pointSize * 1.3) + 8;
-    }
-}
-
 // --------------------------------------------------------------- subclasses
 
 // Forward declarations, so the ObjC method bodies can reach them.
-var choose = function () {};
+var act = function () {};
 var quit = function () {};
-var advance = function () {};
 var settle = function () {};
 var grabFocus = function () {};
+
+// What a button or key means. Tags double as the NSButton tags.
+var STILL = 0, GOT = 1, SHOW = 2;
 
 ObjC.registerSubclass({
     name: 'DrillRoot',
@@ -178,13 +174,19 @@ ObjC.registerSubclass({
                 // JXA bridge is not dependable about either one alone.
                 var code = ev.keyCode;
                 if (code === 53) { quit('escape'); return; }      // Escape
-                var byCode = { 18: 0, 19: 1, 20: 2, 21: 3,        // number row
-                               83: 0, 84: 1, 85: 2, 86: 3 };      // keypad
-                if (byCode[code] !== undefined) { choose(byCode[code]); return; }
+                if (code === 49 || code === 36 || code === 76) {  // space, return, enter
+                    act(SHOW); return;
+                }
+                var byCode = { 18: STILL, 19: GOT,                // 1, 2
+                               83: STILL, 84: GOT,                // keypad
+                               123: STILL, 124: GOT };            // left, right
+                if (byCode[code] !== undefined) { act(byCode[code]); return; }
                 var ch = ObjC.unwrap(ev.charactersIgnoringModifiers) ||
                          ObjC.unwrap(ev.characters) || '';
                 if (ch === String.fromCharCode(27)) { quit('escape'); return; }
-                if (ch !== '' && '1234'.indexOf(ch) >= 0) choose(parseInt(ch, 10) - 1);
+                if (ch === '1') act(STILL);
+                else if (ch === '2') act(GOT);
+                else if (ch === ' ') act(SHOW);
             }
         }
     }
@@ -204,17 +206,31 @@ ObjC.registerSubclass({
     }
 });
 
+// The card face. It must never become first responder: if clicking the text
+// took the keyboard, space / 1 / 2 would stop working for the rest of the
+// session. Scrolling with the trackpad does not need it.
+ObjC.registerSubclass({
+    name: 'DrillWeb',
+    superclass: 'WKWebView',
+    methods: {
+        'acceptsFirstResponder': {
+            types: ['bool', []],
+            implementation: function () { return false; }
+        },
+        'acceptsFirstMouse:': {
+            types: ['bool', ['id']],
+            implementation: function () { return true; }
+        }
+    }
+});
+
 ObjC.registerSubclass({
     name: 'DrillAgent',
     superclass: 'NSObject',
     methods: {
-        'advance:': {
-            types: ['void', ['id']],
-            implementation: function () { advance(); }
-        },
         'pick:': {
             types: ['void', ['id']],
-            implementation: function (sender) { choose(sender.tag); }
+            implementation: function (sender) { act(sender.tag); }
         },
         'quitNow:': {
             types: ['void', ['id']],
@@ -242,140 +258,75 @@ ObjC.registerSubclass({
 // -------------------------------------------------------------------- state
 
 var STARTED = false;
-var win, root, kicker, footer, agent, app;
-var prompt = null;      // rebuilt per card, because its height varies
-var rows = [];          // {box, hit, letter, text, value}
+var win, root, kicker, footer, agent, app, web;
+var closing = null;     // the "Done" line, built when the session ends
+var btns = {};          // SHOW / STILL / GOT -> {views: [...], sub}
 var cards = [], PAYLOAD = null, SESSION = '';
 var i = 0, right = 0, wrong = 0;
-var locked = false, finished = false;
+var revealed = false, finished = false;
 var dues = [];          // epoch seconds produced by this session's answers
 
-function clearCard() {
-    if (prompt) { prompt.removeFromSuperview; prompt = null; }
-    for (var k = 0; k < rows.length; k++) {
-        rows[k].box.removeFromSuperview;
-        rows[k].hit.removeFromSuperview;
-    }
-    rows = [];
+// The card page takes its card from the URL fragment (see card.html for why
+// there is no evaluateJavaScript here). Changing only the fragment is a
+// same-document navigation, so flipping a card does not reload the page.
+function showCard(withBack) {
+    var c = cards[i];
+    var frag = encodeURIComponent(JSON.stringify(
+        { front: c.front, back: c.back, show: withBack }));
+    var base = $.NSURL.fileURLWithPath(DIR + '/webapp/card.html').absoluteString;
+    web.loadFileURLAllowingReadAccessToURL(
+        $.NSURL.URLWithString(ObjC.unwrap(base) + '#' + frag),
+        $.NSURL.fileURLWithPath(DIR + '/webapp'));
 }
 
-function buildRow(idx, text) {
-    var y = ROW_TOP - ROW_H - idx * (ROW_H + ROW_GAP);
-    var box = $.NSBox.alloc.initWithFrame($.NSMakeRect(PAD, y, ROW_W, ROW_H));
+// A native button: a box, two labels, and a transparent NSButton over the lot
+// (see DrillHit). The box cannot take the click itself -- a plain view never
+// receives mouseDown through the NSTextFields on top of it.
+function makeButton(tag, rect, title, color, border) {
+    var views = [];
+    var box = $.NSBox.alloc.initWithFrame(rect);
     box.boxType = BOX_CUSTOM;
     box.titlePosition = NO_TITLE;
     box.fillColor = ROW;
-    box.borderColor = LINE;
+    box.borderColor = border;
     box.borderWidth = 1;
-    box.cornerRadius = 8;
-
-    // NSBox insets its content view, so place children relative to that.
-    var letter = label(String.fromCharCode(65 + idx),
-        $.NSMakeRect(18, 14, 22, 20), F_LETTER, MUTED, LEFT, false);
-    var body = label(text,
-        $.NSMakeRect(46, 14, ROW_W - 66, 20), F_OPT, FG, LEFT, false);
-    box.contentView.addSubview(letter);
-    box.contentView.addSubview(body);
+    box.cornerRadius = 10;
     root.addSubview(box);
+    views.push(box);
 
-    // A transparent NSButton over the whole row does the clicking. The box
-    // cannot: a plain view's mouseDown never arrives, because the NSTextField
-    // on top of it eats the event first. A transparent button still tracks the
-    // mouse, it just does not draw. It must refuse first responder, or
-    // clicking would take the keyboard off the root view and 1-4 would stop
-    // working for the rest of the session.
-    var hit = $.DrillHit.alloc.initWithFrame($.NSMakeRect(PAD, y, ROW_W, ROW_H));
+    var t = label(title,
+        $.NSMakeRect(rect.origin.x, rect.origin.y + 24, rect.size.width, 22),
+        F_BTN, color, CENTER, false);
+    root.addSubview(t);
+    views.push(t);
+
+    var sub = label('',
+        $.NSMakeRect(rect.origin.x, rect.origin.y + 8, rect.size.width, 16),
+        F_SUB, MUTED, CENTER, false);
+    root.addSubview(sub);
+    views.push(sub);
+
+    // It must refuse first responder, or clicking would take the keyboard off
+    // the root view and the keys would stop working for the rest of the session.
+    var hit = $.DrillHit.alloc.initWithFrame(rect);
     hit.title = '';
     hit.bordered = false;
     hit.transparent = true;
     hit.focusRingType = 1;          // NSFocusRingTypeNone
     hit.refusesFirstResponder = true;
-    hit.tag = idx;
+    hit.tag = tag;
     hit.target = agent;
     hit.action = 'pick:';
     root.addSubview(hit);
+    views.push(hit);
 
-    rows.push({ box: box, hit: hit, letter: letter, text: body, value: text });
+    btns[tag] = { views: views, sub: sub };
 }
 
-function show() {
-    clearCard();
-    if (i >= cards.length) { showDone(); return; }
-    var c = cards[i];
-
-    kicker.stringValue = c.kicker;
-
-    var h = textHeight(c.prompt, F_PROMPT, W - 80);
-    prompt = label(c.prompt,
-        $.NSMakeRect(40, Math.round(PROMPT_MID - h / 2), W - 80, h),
-        F_PROMPT, FG, CENTER, true);
-    root.addSubview(prompt);
-
-    for (var k = 0; k < c.options.length; k++) buildRow(k, c.options[k]);
-
-    var foot = (i + 1) + ' of ' + cards.length + '   ·   press 1–4';
-    if (PAYLOAD.crankEndsAt) {
-        var left = Math.max(0, Math.ceil((PAYLOAD.crankEndsAt - Date.now() / 1000) / 60));
-        foot += '   ·   ' + left + ' min left';
-    }
-    footer.stringValue = foot;
-    locked = false;
+function setHidden(tag, hide) {
+    var v = btns[tag].views;
+    for (var k = 0; k < v.length; k++) v[k].hidden = hide;
 }
-
-choose = function (idx) {
-    // The bridge hands back an NSButton's tag as a string, so a strict
-    // comparison against the loop counter below would never match and the
-    // chosen row would never turn red -- every answer looked correct.
-    idx = parseInt(idx, 10);
-    if (isNaN(idx) || locked || finished || idx < 0 || idx >= rows.length) return;
-    locked = true;
-
-    var c = cards[i];
-    var correct = rows[idx].value === c.answer;
-
-    for (var k = 0; k < rows.length; k++) {
-        var r = rows[k];
-        if (r.value === c.answer) {
-            r.box.borderColor = GREEN;
-            r.text.textColor = GREEN;
-            r.letter.textColor = GREEN;
-        } else if (k === idx) {
-            r.box.borderColor = RED;
-            r.text.textColor = RED;
-            r.letter.textColor = RED;
-        }
-    }
-
-    if (correct) {
-        right++;
-        dues.push(c.dueIfRight);
-        footer.stringValue = 'Correct';
-    } else {
-        wrong++;
-        dues.push(c.dueIfWrong);
-        footer.stringValue = c.answer + (c.hint ? '  —  ' + c.hint : '');
-    }
-
-    // Tell drill.py straight away, so a crash or a force-quit costs at most
-    // the card currently on screen.
-    emit({ t: 'answer', id: c.id, correct: correct });
-
-    i++;
-    $.NSTimer.scheduledTimerWithTimeIntervalTargetSelectorUserInfoRepeats(
-        correct ? 1.1 : 2.1, agent, 'advance:', $(), false);
-};
-
-advance = function () { if (!finished) show(); };
-
-settle = function () { win.level = $.NSNormalWindowLevel; };
-
-grabFocus = function () {
-    $.NSRunningApplication.currentApplication.activateWithOptions(
-        $.NSApplicationActivateIgnoringOtherApps);
-    app.activateIgnoringOtherApps(true);
-    win.makeKeyAndOrderFront($());
-    win.makeFirstResponder(root);
-};
 
 function humanDelta(epoch) {
     var secs = epoch - (new Date().getTime() / 1000);
@@ -387,15 +338,87 @@ function humanDelta(epoch) {
     return 'in ' + Math.round(hours / 24) + 'd';
 }
 
+function footText(extra) {
+    var foot = (i + 1) + ' of ' + cards.length + '   ·   ' + extra;
+    if (PAYLOAD.crankEndsAt) {
+        var left = Math.max(0, Math.ceil((PAYLOAD.crankEndsAt - Date.now() / 1000) / 60));
+        foot += '   ·   ' + left + ' min left';
+    }
+    return foot;
+}
+
+function show() {
+    if (i >= cards.length) { showDone(); return; }
+    var c = cards[i];
+    revealed = false;
+
+    kicker.stringValue = (c.cat || '').toUpperCase();
+    showCard(false);
+
+    setHidden(SHOW, false);
+    setHidden(STILL, true);
+    setHidden(GOT, true);
+    footer.stringValue = footText('space to turn it over');
+}
+
+function reveal() {
+    revealed = true;
+    var c = cards[i];
+    showCard(true);
+    btns[STILL].sub.stringValue = 'again ' + humanDelta(c.dueIfWrong);
+    btns[GOT].sub.stringValue = 'next ' + humanDelta(c.dueIfRight);
+    setHidden(SHOW, true);
+    setHidden(STILL, false);
+    setHidden(GOT, false);
+    footer.stringValue = footText('1 still learning   ·   2 got it');
+}
+
+// Everything the window can be asked to do, from a click or a key.
+act = function (what) {
+    what = parseInt(what, 10);      // an NSButton's tag arrives as a string
+    if (isNaN(what) || finished) return;
+
+    if (what === SHOW) { if (!revealed) reveal(); return; }
+
+    // Grading is only possible once the answer has been seen. This is the
+    // whole point of the flow: a key pressed too early must not count.
+    if (!revealed) return;
+    var c = cards[i];
+    var got = (what === GOT);
+    revealed = false;
+
+    if (got) { right++; dues.push(c.dueIfRight); }
+    else { wrong++; dues.push(c.dueIfWrong); }
+
+    // Tell drill.py straight away, so a crash or a force-quit costs at most
+    // the card currently on screen. `correct` means "got it".
+    emit({ t: 'answer', id: c.id, correct: got });
+
+    i++;
+    show();
+};
+
+settle = function () { win.level = $.NSNormalWindowLevel; };
+
+grabFocus = function () {
+    $.NSRunningApplication.currentApplication.activateWithOptions(
+        $.NSApplicationActivateIgnoringOtherApps);
+    app.activateIgnoringOtherApps(true);
+    win.makeKeyAndOrderFront($());
+    win.makeFirstResponder(root);
+};
+
 function showDone() {
-    clearCard();
+    setHidden(SHOW, true);
+    setHidden(STILL, true);
+    setHidden(GOT, true);
+    web.hidden = true;
     kicker.stringValue = '';
-    var text = 'Done — ' + right + '/' + (right + wrong) + ' right';
-    var h = textHeight(text, F_PROMPT, W - 80);
-    prompt = label(text,
-        $.NSMakeRect(40, Math.round(PROMPT_MID - h / 2), W - 80, h),
+
+    var text = 'Done — ' + right + '/' + (right + wrong) + ' got it';
+    closing = label(text, $.NSMakeRect(40, PROMPT_MID - 20, W - 80, 40),
         F_PROMPT, FG, CENTER, true);
-    root.addSubview(prompt);
+    root.addSubview(closing);
 
     if (PAYLOAD.crankEndsAt && Date.now() / 1000 < PAYLOAD.crankEndsAt - 20) {
         footer.stringValue = 'Next round in a moment…';
@@ -449,7 +472,7 @@ function start() {
         $.NSMakeRect(0, 0, W, H),
         $.NSWindowStyleMaskTitled | $.NSWindowStyleMaskClosable,
         $.NSBackingStoreBuffered, false);
-    win.title = 'Arabic';
+    win.title = 'Recall';
     win.backgroundColor = BG;
     win.releasedWhenClosed = false;
 
@@ -467,19 +490,36 @@ function start() {
     backdrop.fillColor = BG;
     root.addSubview(backdrop);
 
-    kicker = label('', $.NSMakeRect(PAD, 412, ROW_W, 18),
+    kicker = label('', $.NSMakeRect(PAD, H - 46, W - PAD * 2, 18),
         F_KICKER, MUTED, CENTER, false);
     root.addSubview(kicker);
 
-    footer = label('', $.NSMakeRect(30, 26, W - 60, 34),
-        F_FOOT, MUTED, CENTER, true);
+    footer = label('', $.NSMakeRect(30, FOOT_Y, W - 60, 18),
+        F_FOOT, MUTED, CENTER, false);
     root.addSubview(footer);
+
+    var bw = (W - PAD * 2 - BTN_GAP) / 2;
+    makeButton(SHOW, $.NSMakeRect(PAD, BTN_Y, W - PAD * 2, BTN_H),
+               'Show answer', FG, LINE);
+    btns[SHOW].sub.stringValue = 'space';
+    makeButton(STILL, $.NSMakeRect(PAD, BTN_Y, bw, BTN_H),
+               'Still learning', RED, RED);
+    makeButton(GOT, $.NSMakeRect(PAD + bw + BTN_GAP, BTN_Y, bw, BTN_H),
+               'Got it', GREEN, GREEN);
+
+    // The card face. Pointed at the page by file URL with read access to the
+    // webapp directory, which is where KaTeX and its fonts live.
+    var conf = $.WKWebViewConfiguration.alloc.init;
+    web = $.DrillWeb.alloc.initWithFrameConfiguration(
+        $.NSMakeRect(0, WEB_Y, W, H - WEB_Y - WEB_TOP), conf);
+    root.addSubview(web);
 
     show();
 
     if (SNAPSHOT) {
-        // Draw frames to PNG and leave, so the layout can be checked without
-        // screen-recording permission.
+        // Draw the native parts to PNG and leave. The web view does not
+        // appear in a cacheDisplayInRect: snapshot, so this checks layout
+        // and buttons only.
         var pick = env('DRILL_SNAPSHOT_PICK');
         var snap = function (path) {
             root.displayIfNeeded;
@@ -491,8 +531,8 @@ function start() {
         };
         snap(SNAPSHOT);
         if (pick !== null) {
-            choose(parseInt(pick, 10));
-            snap(SNAPSHOT.replace(/\.png$/, '-graded.png'));
+            act(SHOW);
+            snap(SNAPSHOT.replace(/\.png$/, '-revealed.png'));
         }
         $.NSApp.terminate($());
         return;

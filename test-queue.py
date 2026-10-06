@@ -2,20 +2,17 @@
 """Queue-building invariants for drill.py (the reference side).
 
 test-queue.js asserts the same invariants over webapp/srs.js. The queue
-builders are randomised on purpose (ORDER_SLACK), so every scenario runs
-many times: an invariant that only usually holds is a bug.
+builders shuffle on purpose, so every scenario runs many times: an invariant
+that only usually holds is a bug.
 
-  * a session never exceeds SESSION_CAP
+  * a session never exceeds SESSION_CAP, and never repeats a card
   * mode=due introduces at most NEW_PER_SESSION never-seen cards
+  * a backlog cannot crowd out new material: NEW_RESERVED slots are held
   * reviews come before new material
-  * a healthy session shows one direction per item; the reverse waits
-  * a thin session pads with siblings but spreads them as far apart as
-    the item count allows
-  * cards tagged deliver="table" are never handed out as flashcards, in
-    any mode
+  * only due cards are served in mode=due
+  * every practice mode serves what its name says
 """
 
-import json
 import os
 import sys
 from datetime import datetime, timedelta
@@ -37,48 +34,39 @@ def check(cond, msg):
         print(f"FAIL: {msg}")
 
 
-def make_deck(n_items):
-    cards = []
-    for i in range(n_items):
-        base = f"item{i:02d}"
-        for d in ("ar2en", "en2ar"):
-            cards.append({
-                "id": f"vocab:{base}:{d}", "dir": d,
-                "prompt": f"p{i}{d}", "answer": f"a{i}{d}", "hint": "",
-                "options": [f"a{i}{d}", "x", "y", "z"], "cat": "vocab",
-                "lesson": "L1",
-            })
-    return cards
+def make_deck(n):
+    topics = ["rl", "math", "ml"]
+    return [{"id": f"{topics[i % 3]}:item{i:02d}", "front": f"q{i}",
+             "back": f"a{i}", "cat": topics[i % 3],
+             "batch": "b1" if i < n // 2 else "b2"} for i in range(n)]
 
 
-def seen_entry(minutes_ago=60, reps=3):
-    return {"due": (NOW - timedelta(minutes=minutes_ago))
-            .isoformat(timespec="seconds"),
+def seen_entry(minutes_ago=60, reps=3, due_in=None):
+    due = (NOW + timedelta(minutes=due_in)) if due_in is not None \
+        else NOW - timedelta(minutes=minutes_ago)
+    return {"due": due.isoformat(timespec="seconds"),
             "step": 3, "interval_min": 1440, "ease": 2.5,
             "reps": reps, "lapses": 0}
 
 
-def bases(queue):
-    return [drill.base_of(c["id"]) for c, _ in queue]
+def ids(queue):
+    return [c["id"] for c, _ in queue]
 
 
-def min_same_base_gap(queue):
-    last = {}
-    gap = len(queue)
-    for i, b in enumerate(bases(queue)):
-        if b in last:
-            gap = min(gap, i - last[b])
-        last[b] = i
-    return gap
-
-
-# --- healthy session: big seen backlog --------------------------------------
-deck = make_deck(26)
+# --- big seen backlog: capped, no repeats -----------------------------------
+deck = make_deck(30)
 state = {c["id"]: seen_entry() for c in deck}
 for _ in range(TRIALS):
     q = drill.select_queue(deck, state, "due", NOW)
     check(len(q) == drill.SESSION_CAP, f"cap: got {len(q)}")
-    check(len(set(bases(q))) == len(q), "healthy session repeats an item")
+    check(len(set(ids(q))) == len(q), "a card was served twice")
+
+# --- the oldest backlog is what makes the cut -------------------------------
+state_aged = {c["id"]: seen_entry(minutes_ago=60 + i) for i, c in enumerate(deck)}
+oldest = {c["id"] for c in deck[-drill.SESSION_CAP:]}
+for _ in range(TRIALS):
+    q = drill.select_queue(deck, state_aged, "due", NOW)
+    check(set(ids(q)) == oldest, "a newer review displaced an older one")
 
 # --- all-new deck: the drip -------------------------------------------------
 for _ in range(TRIALS):
@@ -86,51 +74,53 @@ for _ in range(TRIALS):
     check(len(q) == drill.NEW_PER_SESSION,
           f"new drip: got {len(q)}, want {drill.NEW_PER_SESSION}")
     check(all(e["reps"] == 0 for _, e in q), "non-new card in an all-new deck")
-    check(len(set(bases(q))) == len(q), "new session repeats an item")
+    check(ids(q) == [c["id"] for c in deck[:drill.NEW_PER_SESSION]],
+          "new cards left deck order")
 
 # --- mixed: backlog first, but new cards keep their reserved slots ----------
-deck_mixed = make_deck(28)
-state_mixed = {}
-for i, c in enumerate(deck_mixed):
-    if c["id"].split(":")[1] < "item18":         # 18 items seen, 10 new
-        state_mixed[c["id"]] = seen_entry(minutes_ago=60 + i)
+deck_mixed = make_deck(40)
+state_mixed = {c["id"]: seen_entry(minutes_ago=60 + i)
+               for i, c in enumerate(deck_mixed[:25])}       # 25 seen, 15 new
 for _ in range(TRIALS):
     q = drill.select_queue(deck_mixed, state_mixed, "due", NOW)
     n_new = sum(1 for _, e in q if e["reps"] == 0)
     check(len(q) == drill.SESSION_CAP, f"mixed cap: got {len(q)}")
     check(n_new == drill.NEW_RESERVED,
           f"mixed: {n_new} new, want the {drill.NEW_RESERVED} reserved slots")
-    seen_flags = [e["reps"] > 0 for _, e in q]
-    check(seen_flags == sorted(seen_flags, reverse=True),
-          "a new card came before a review")
+    flags = [e["reps"] > 0 for _, e in q]
+    check(flags == sorted(flags, reverse=True), "a new card came before a review")
 
-# --- thin session: siblings return, spread as far as possible ---------------
-deck_thin = make_deck(4)
-state_thin = {c["id"]: seen_entry() for c in deck_thin}
-for _ in range(TRIALS):
-    q = drill.select_queue(deck_thin, state_thin, "due", NOW)
-    check(len(q) == 8, f"thin session: got {len(q)}, want all 8")
-    check(min_same_base_gap(q) >= 3,
-          f"thin session: siblings {min_same_base_gap(q)} apart")
+# --- due mode serves only what is due ---------------------------------------
+state_future = {c["id"]: seen_entry(due_in=600) for c in deck}
+state_future[deck[0]["id"]] = seen_entry()
+q = drill.select_queue(deck, state_future, "due", NOW)
+check(ids(q) == [deck[0]["id"]], f"due mode served {ids(q)}")
 
-# --- deliver="table" never drills, in any mode ------------------------------
+# --- every practice mode serves what its name says --------------------------
+lapsed = {c["id"]: dict(seen_entry(due_in=600), lapses=2, ease=2.1)
+          for c in deck[:6]}
+for _ in range(TRIALS // 4):
+    for topic in ("rl", "math", "ml"):
+        q = drill.select_queue(deck, {}, f"topic:{topic}", NOW)
+        check(q and all(c["cat"] == topic for c, _ in q), f"topic:{topic}")
+    q = drill.select_queue(deck, {}, "batch", NOW)
+    check(q and all(c["batch"] == "b2" for c, _ in q), "batch is not the latest")
+    q = drill.select_queue(deck, lapsed, "hardest", NOW)
+    check(len(q) == 6 and set(ids(q)) == set(lapsed), "hardest")
+    q = drill.select_queue(deck, lapsed, "new", NOW)
+    check(q and all(c["id"] not in lapsed for c, _ in q), "new served a seen card")
+    q = drill.select_queue(deck, {}, "all", NOW)
+    check(len(q) <= drill.SESSION_CAP and len(set(ids(q))) == len(q), "all")
+check(drill.select_queue(deck, {}, "topic:nope", NOW) == [], "unknown topic")
+
+# --- the example deck loads and every mode copes with it --------------------
 drill.CARDS = os.path.join(HERE, "cards.example.json")
-example = drill.load_cards(for_drill=True)
-example_all = drill.load_cards(for_drill=False)
-check(len(example_all) > len(example), "example deck has no table cards")
-check(all(c.get("deliver") != "table" for c in example),
-      "load_cards(for_drill=True) let a table card through")
-table_ids = {c["id"] for c in example_all if c.get("deliver") == "table"}
-modes = ["due", "all", "vocab", "sentences", "ar2en", "en2ar",
-         "hardest", "new", "lesson"]
-lapsed = {c["id"]: dict(seen_entry(), lapses=2, ease=2.1) for c in example_all}
-for mode in modes:
-    for st in ({}, lapsed):
-        for _ in range(10):
-            q = drill.select_queue(example, st, mode, NOW)
-            check(not any(c["id"] in table_ids for c, _ in q),
-                  f"table card drilled in mode {mode}")
-            check(len(q) <= drill.SESSION_CAP, f"cap broken in mode {mode}")
+example = drill.load_cards()
+check(len(example) > 0, "example deck is empty")
+for mode in ["due", "all", "hardest", "new", "batch", "topic:" + example[0]["cat"]]:
+    for st in ({}, {c["id"]: dict(seen_entry(), lapses=2) for c in example}):
+        q = drill.select_queue(example, st, mode, NOW)
+        check(len(q) <= drill.SESSION_CAP, f"cap broken in mode {mode}")
 
 print(f"test-queue.py: {'FAILED, ' + str(len(failures)) + ' failure(s)' if failures else 'all invariants hold'}")
 sys.exit(1 if failures else 0)

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The Mac drill window shows this page in a WKWebView (see drill_ui.js).
+     It is only a typesetter: all the buttons and keys are native. -->
+<link rel="stylesheet" href="./vendor/katex/katex.min.css">
+<link rel="stylesheet" href="./card.css">
+<style>
+  :root{--bg:#1c1c1e;--row:#26262a;--row2:#2c2c30;--fg:#f2f2f7;--muted:#8e8e93;
+        --line:#3a3a3c}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--fg);
+            font:16px -apple-system,system-ui,sans-serif}
+  body{padding:4px 34px 24px;-webkit-user-select:text}
+  ::-webkit-scrollbar{width:0}
+</style>
+</head>
+<body>
+<div class="card" id="card"></div>
+<script src="./vendor/katex/katex.min.js"></script>
+<script src="./render.js"></script>
+<script>
+  // The native window cannot call into this page: JXA cannot make the
+  // completion-handler block that evaluateJavaScript wants, and a nil one
+  // crashes the process when WebKit invokes it. So the window hands over the
+  // card in the URL fragment instead -- #{"front":..,"back":..,"show":bool} --
+  // and a fragment-only navigation fires hashchange without reloading.
+  function paint() {
+    var cur;
+    try { cur = JSON.parse(decodeURIComponent(location.hash.slice(1))); }
+    catch (e) { return; }
+    var h = '<div class="front">' + renderCard(cur.front) + '</div>';
+    if (cur.show) {
+      h += '<div class="rule"></div><div class="back-label">ANSWER</div>' +
+           '<div class="back">' + renderCard(cur.back) + '</div>';
+    }
+    document.getElementById('card').innerHTML = h;
+    var r = document.querySelector('.rule');
+    // New card: top. Answer turned over: bring its start to the top of the
+    // view, if the page is long enough to scroll.
+    window.scrollTo(0, cur.show && r
+        ? Math.max(0, r.getBoundingClientRect().top + window.pageYOffset - 24) : 0);
+  }
+  window.addEventListener('hashchange', paint);
+  paint();
+</script>
+</body>
+</html>
